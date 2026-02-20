@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiPaperclip, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag } from 'react-icons/fi'
+import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
-import { getTaskComments, createTaskComment, deleteTaskComment, getTaskAttachments, uploadTaskAttachment, deleteTaskAttachment, updateSubtask } from '../../lib/api'
+import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, updateSubtask } from '../../lib/api'
 import type { TaskComment } from '../../types/database'
 import styles from './TaskDetailPanel.module.css'
 

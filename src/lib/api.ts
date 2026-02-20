@@ -208,7 +208,7 @@ export const getTasks = async (boardId: string) => {
         .eq('task_id', task.id)
 
       // Get profiles for each assignee
-      let assigneesWithProfiles = []
+      const assigneesWithProfiles: { id: string; user_id: string; profiles: any }[] = []
       if (assignees && assignees.length > 0) {
         const userIds = assignees.map(a => a.user_id)
         const { data: profiles } = await supabase
@@ -216,10 +216,12 @@ export const getTasks = async (boardId: string) => {
           .select('*')
           .in('id', userIds)
 
-        assigneesWithProfiles = assignees.map(a => ({
-          ...a,
-          profiles: profiles?.find(p => p.id === a.user_id) || null
-        }))
+        for (const a of assignees) {
+          assigneesWithProfiles.push({
+            ...a,
+            profiles: profiles?.find(p => p.id === a.user_id) || null
+          })
+        }
       }
 
       return {
@@ -280,7 +282,7 @@ export const getAssignedTasks = async (userId: string) => {
         .eq('task_id', task.id)
 
       // Get profiles for each assignee
-      let assigneesWithProfiles = []
+      const assigneesWithProfiles: { id: string; user_id: string; profiles: any }[] = []
       if (assignees && assignees.length > 0) {
         const userIds = assignees.map(a => a.user_id)
         const { data: profiles } = await supabase
@@ -288,10 +290,12 @@ export const getAssignedTasks = async (userId: string) => {
           .select('*')
           .in('id', userIds)
 
-        assigneesWithProfiles = assignees.map(a => ({
-          ...a,
-          profiles: profiles?.find(p => p.id === a.user_id) || null
-        }))
+        for (const a of assignees) {
+          assigneesWithProfiles.push({
+            ...a,
+            profiles: profiles?.find(p => p.id === a.user_id) || null
+          })
+        }
       }
 
       return {

@@ -5,7 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config'
 const supabaseUrl = SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase credentials. Update src/lib/config.ts with your Supabase URL and Anon Key.')
 }
 
