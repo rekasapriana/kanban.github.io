@@ -1,0 +1,136 @@
+:root {
+  /* Colors - Light Theme (Miro-inspired) */
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f0f2;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafafa;
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #64648c;
+  --text-muted: #9090a8;
+  --text-dark: #1a1a2e;
+
+  --border-color: #e4e4e8;
+  --border-light: #f0f0f2;
+
+  /* Modern Accent - Blue/Purple */
+  --accent: #5048e5;
+  --accent-hover: #4338ca;
+  --accent-light: rgba(80, 72, 229, 0.1);
+  --accent-muted: rgba(80, 72, 229, 0.05);
+
+  /* Status Colors - Soft Pastels */
+  --color-todo: #ef4444;
+  --color-progress: #f59e0b;
+  --color-review: #06b6d4;
+  --color-done: #10b981;
+  --color-archive: #6b7280;
+
+  /* Column Colors - Soft Pastels */
+  --column-todo: #fef2f2;
+  --column-todo-border: #fecaca;
+  --column-progress: #fffbeb;
+  --column-progress-border: #fde68a;
+  --column-review: #ecfeff;
+  --column-review-border: #a5f3fc;
+  --column-done: #ecfdf5;
+  --column-done-border: #a7f3d0;
+  --column-archive: #f9fafb;
+  --column-archive-border: #e5e7eb;
+
+  /* Status Backgrounds - Light */
+  --color-todo-bg: rgba(239, 68, 68, 0.1);
+  --color-progress-bg: rgba(245, 158, 11, 0.1);
+  --color-review-bg: rgba(6, 182, 212, 0.1);
+  --color-done-bg: rgba(16, 185, 129, 0.1);
+
+  /* Shadows - Soft Light */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 30px rgba(80, 72, 229, 0.15);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Border Radius - Consistent */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* Font */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Z-index layers */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 500;
+  --z-modal: 1000;
+  --z-toast: 2000;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: #0f0f14;
+  --bg-secondary: #1a1a24;
+  --bg-tertiary: #252532;
+  --bg-card: #1a1a24;
+  --bg-card-hover: #252532;
+
+  --text-primary: #f0f0f5;
+  --text-secondary: #a0a0b8;
+  --text-muted: #6b6b80;
+  --text-dark: #f0f0f5;
+
+  --border-color: #2a2a3a;
+  --border-light: #353548;
+
+  /* Accent stays the same but with adjusted opacity for dark */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-light: rgba(99, 102, 241, 0.15);
+  --accent-muted: rgba(99, 102, 241, 0.1);
+
+  /* Column Colors - Dark Mode */
+  --column-todo: rgba(239, 68, 68, 0.1);
+  --column-todo-border: rgba(239, 68, 68, 0.3);
+  --column-progress: rgba(245, 158, 11, 0.1);
+  --column-progress-border: rgba(245, 158, 11, 0.3);
+  --column-review: rgba(6, 182, 212, 0.1);
+  --column-review-border: rgba(6, 182, 212, 0.3);
+  --column-done: rgba(16, 185, 129, 0.1);
+  --column-done-border: rgba(16, 185, 129, 0.3);
+  --column-archive: rgba(107, 114, 128, 0.1);
+  --column-archive-border: rgba(107, 114, 128, 0.3);
+
+  /* Status Backgrounds - Dark */
+  --color-todo-bg: rgba(239, 68, 68, 0.15);
+  --color-progress-bg: rgba(245, 158, 11, 0.15);
+  --color-review-bg: rgba(6, 182, 212, 0.15);
+  --color-done-bg: rgba(16, 185, 129, 0.15);
+
+  /* Shadows - Dark Mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.2);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
