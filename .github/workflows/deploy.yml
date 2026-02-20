@@ -1,32 +1,23 @@
-name: Deploy to GitHub Pages
+name: deploy
 
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+on: push
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install
+      - name: Install dependencies
         run: npm install
 
       - name: Build
