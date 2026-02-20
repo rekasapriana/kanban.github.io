@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Use config file values, fallback to env variables
+const supabaseUrl = SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check your .env file.')
+if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'YOUR_ANON_KEY_HERE') {
+  throw new Error('Missing Supabase credentials. Update src/lib/config.ts with your Supabase URL and Anon Key.')
 }
 
 // Custom storage that doesn't use locks
