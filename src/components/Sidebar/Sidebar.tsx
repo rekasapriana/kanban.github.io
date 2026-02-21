@@ -105,7 +105,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       )}
 
       <aside className={`${styles.sidebar} ${isMobile ? styles.mobileSidebar : ''} ${isMobile && isOpen ? styles.mobileOpen : ''}`}>
-        {/* Header - Workspace Selector & User Profile */}
+        {/* Header - Workspace Selector */}
         <div className={styles.sidebarHeader}>
           <div className={styles.workspaceSelector} ref={workspaceRef}>
             <button
@@ -126,20 +126,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 </button>
               </div>
             )}
-          </div>
-
-          <div className={styles.userProfile} ref={workspaceRef}>
-            <button
-              className={styles.userBtn}
-              onClick={() => {
-                setView('settings')
-                if (isMobile && onClose) onClose()
-              }}
-            >
-              <div className={styles.userAvatar}>
-                <span>{displayName?.charAt(0).toUpperCase() || 'U'}</span>
-              </div>
-            </button>
           </div>
 
           {isMobile && (

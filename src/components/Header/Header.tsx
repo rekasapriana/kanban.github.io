@@ -1,6 +1,7 @@
 import { FiColumns, FiPlus, FiMenu } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import NotificationBell from '../Notifications/NotificationBell'
+import UserMenu from './UserMenu'
 import styles from './Header.module.css'
 
 interface HeaderProps {
@@ -40,6 +41,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <FiPlus />
           <span className={styles.addBtnText}>New Task</span>
         </button>
+        <UserMenu />
       </div>
     </header>
   )
