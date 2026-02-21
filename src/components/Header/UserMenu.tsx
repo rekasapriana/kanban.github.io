@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { FiUser, FiSettings, FiLogOut, FiPlus, FiBriefcase } from 'react-icons/fi'
+import { FiEdit2, FiMoon, FiSun, FiHelpCircle, FiUsers, FiBarChart2, FiLogOut } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useView } from '../../context/ViewContext'
+import { useTheme } from '../../context/ThemeContext'
 import styles from './Header.module.css'
 
 export default function UserMenu() {
   const { user, profile, signOutUser } = useAuth()
   const { setView } = useView()
+  const { theme, toggleTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -46,17 +48,6 @@ export default function UserMenu() {
             <span className={styles.userDropdownEmail}>{user?.email}</span>
           </div>
           <div className={styles.userDropdownDivider} />
-          <div className={styles.userDropdownSection}>
-            <span className={styles.userDropdownSectionTitle}>WORKSPACE</span>
-            <button className={styles.userDropdownItem}>
-              <FiBriefcase /> Kanban Ale Ale
-              <span className={styles.workspaceBadge}>Active</span>
-            </button>
-            <button className={styles.userDropdownItem}>
-              <FiPlus /> Add Workspace
-            </button>
-          </div>
-          <div className={styles.userDropdownDivider} />
           <button
             className={styles.userDropdownItem}
             onClick={() => {
@@ -64,8 +55,44 @@ export default function UserMenu() {
               setIsOpen(false)
             }}
           >
-            <FiSettings /> Settings
+            <FiEdit2 /> Edit Profile
           </button>
+          <div className={styles.userDropdownDivider} />
+          <div className={styles.userDropdownSection}>
+            <span className={styles.userDropdownSectionTitle}>TEAM & REPORT</span>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                setView('reports')
+                setIsOpen(false)
+              }}
+            >
+              <FiBarChart2 /> Team Reports
+            </button>
+          </div>
+          <div className={styles.userDropdownDivider} />
+          <div className={styles.userDropdownSection}>
+            <span className={styles.userDropdownSectionTitle}>PREFERENCES</span>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                toggleTheme()
+              }}
+            >
+              {theme === 'dark' ? <FiSun /> : <FiMoon />} Dark Mode
+              <span className={styles.toggleBadge}>{theme === 'dark' ? 'On' : 'Off'}</span>
+            </button>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                setView('help')
+                setIsOpen(false)
+              }}
+            >
+              <FiHelpCircle /> Help
+            </button>
+          </div>
+          <div className={styles.userDropdownDivider} />
           <button
             className={styles.userDropdownItem}
             onClick={() => {
