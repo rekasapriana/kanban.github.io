@@ -41,7 +41,7 @@
 
 /* Header */
 .sidebarHeader {
-  padding: var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
