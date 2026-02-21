@@ -32,7 +32,7 @@ export default function UserMenu() {
             <FiUser />
           )}
         </div>
-        <span>{profile?.full_name || profile?.email?.split('@')[0] || 'User'}</span>
+        <span>{profile?.full_name || 'User'}</span>
         <FiChevronDown />
       </button>
 
