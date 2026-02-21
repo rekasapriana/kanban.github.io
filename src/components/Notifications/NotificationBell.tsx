@@ -27,7 +27,7 @@ type CombinedNotification = (Notification & { isInvitation?: false }) | {
 
 export default function NotificationBell() {
   const { user } = useAuth()
-  const { openDetailPanel, setViewMode } = useBoard()
+  const { openDetailPanel, setViewMode, loadTasks } = useBoard()
   const { showToast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<CombinedNotification[]>([])
@@ -124,6 +124,8 @@ export default function NotificationBell() {
       if (taskNotif.task_id) {
         // Switch to board view first
         setViewMode('board')
+        // Refresh tasks to get latest data
+        await loadTasks()
         // Open the task detail panel
         openDetailPanel(taskNotif.task_id)
       }
