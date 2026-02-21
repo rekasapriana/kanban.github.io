@@ -241,7 +241,6 @@ export default function TaskModal() {
   return (
     <div
       className={`${styles.modalOverlay} ${state.isModalOpen ? styles.active : ''}`}
-      onClick={handleOverlayClick}
     >
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
