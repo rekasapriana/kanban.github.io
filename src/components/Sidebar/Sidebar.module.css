@@ -52,7 +52,6 @@
 
 /* Workspace Selector */
 .workspaceSelector {
-  position: relative;
   flex: 1;
 }
 
@@ -61,15 +60,6 @@
   align-items: center;
   gap: var(--spacing-xs);
   padding: 6px 8px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.workspaceBtn:hover {
-  background: var(--bg-tertiary);
 }
 
 .workspaceIcon {
@@ -93,98 +83,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.chevron {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
-  transition: transform 0.2s;
-  flex-shrink: 0;
-}
-
-.chevronOpen {
-  transform: rotate(180deg);
-}
-
-.workspaceDropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 160px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  overflow: hidden;
-}
-
-.workspaceDropdownItem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  text-align: left;
-}
-
-.workspaceDropdownItem:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.workspaceDropdownItem svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-/* User Profile */
-.userProfile {
-  flex-shrink: 0;
-}
-
-.userBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.userBtn:hover {
-  background: var(--bg-tertiary);
-}
-
-.userAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c3aed);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
-  overflow: hidden;
-}
-
-.userAvatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .userInfo {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useView, ViewType } from '../../context/ViewContext'
 import {
@@ -18,9 +18,7 @@ import {
   FiUsers,
   FiBarChart2,
   FiBell,
-  FiGrid,
-  FiChevronDown,
-  FiPlus
+  FiGrid
 } from 'react-icons/fi'
 import { useTheme } from '../../context/ThemeContext'
 import styles from './Sidebar.module.css'
@@ -35,8 +33,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const { theme, toggleTheme } = useTheme()
   const { currentView, setView } = useView()
   const [isMobile, setIsMobile] = useState(false)
-  const [workspaceOpen, setWorkspaceOpen] = useState(false)
-  const workspaceRef = useRef<HTMLDivElement>(null)
 
   const companyName = "Kanban Ale Ale"
   const displayName = profile?.full_name || user?.user_metadata?.name || 'User'
@@ -49,17 +45,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-
-  // Close workspace dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (workspaceRef.current && !workspaceRef.current.contains(event.target as Node)) {
-        setWorkspaceOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   // Main menu items
@@ -107,25 +92,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       <aside className={`${styles.sidebar} ${isMobile ? styles.mobileSidebar : ''} ${isMobile && isOpen ? styles.mobileOpen : ''}`}>
         {/* Header - Workspace Selector */}
         <div className={styles.sidebarHeader}>
-          <div className={styles.workspaceSelector} ref={workspaceRef}>
-            <button
-              className={styles.workspaceBtn}
-              onClick={() => setWorkspaceOpen(!workspaceOpen)}
-            >
-              <div className={styles.workspaceIcon}>
-                K
-              </div>
+          <div className={styles.workspaceSelector}>
+            <div className={styles.workspaceBtn}>
+              <div className={styles.workspaceIcon}>K</div>
               <span className={styles.workspaceName}>{companyName}</span>
-              <FiChevronDown className={`${styles.chevron} ${workspaceOpen ? styles.chevronOpen : ''}`} />
-            </button>
-
-            {workspaceOpen && (
-              <div className={styles.workspaceDropdown}>
-                <button className={styles.workspaceDropdownItem}>
-                  <FiPlus /> Add Workspace
-                </button>
-              </div>
-            )}
+            </div>
           </div>
 
           {isMobile && (
