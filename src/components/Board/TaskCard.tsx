@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FiEdit2, FiTrash2, FiRotateCcw, FiMessageCircle, FiImage, FiCheckSquare, FiCalendar, FiFolder, FiStar } from 'react-icons/fi'
+import { FiEdit2, FiTrash2, FiRotateCcw, FiMessageCircle, FiImage, FiCheckSquare, FiCalendar, FiFolder, FiStar, FiLock } from 'react-icons/fi'
 import type { Task } from '../../types/database'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateDisplay, getDateClass, isOverdue } from '../../utils/dateUtils'
 import { getStarredTaskIds, toggleStarredTask } from '../../lib/api'
+import { useTaskPermission } from '../../hooks/useTaskPermission'
 import styles from './Board.module.css'
 
 interface TaskCardProps {
@@ -20,6 +21,7 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
   const { openEditModal, deleteTask, restoreTask, openDetailPanel } = useBoard()
   const { user, profile } = useAuth()
   const [isStarred, setIsStarred] = useState(false)
+  const { canMove, canEdit, canDelete, isOwner } = useTaskPermission(task)
 
   const {
     attributes,
@@ -28,7 +30,10 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     transform,
     transition,
     isDragging: isSortableDragging,
-  } = useSortable({ id: task.id })
+  } = useSortable({
+    id: task.id,
+    disabled: !canMove // Disable drag if user can't move
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -53,9 +58,6 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
   const completedSubtasks = subtasks.filter(s => s.is_completed).length
   const taskLabels = task.task_labels || []
   const project = task.projects
-
-  // Check if current user is the task creator
-  const isOwner = user?.id === task.user_id
 
   // Get display name for avatar
   const displayName = profile?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'U'
@@ -122,12 +124,19 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''}`}
+      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''}`}
       data-priority={task.priority}
       onClick={() => openDetailPanel(task.id)}
       {...attributes}
-      {...listeners}
+      {...(canMove ? listeners : {})}
     >
+      {/* Lock indicator for non-movable tasks */}
+      {!canMove && !isDragging && (
+        <div className={styles.lockIndicator} title="Only task creator and admins can move this task">
+          <FiLock />
+        </div>
+      )}
+
       {/* Task Header with Priority and Menu */}
       <div className={styles.taskHeader}>
         <div className={styles.taskHeaderLeft}>
@@ -159,7 +168,7 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
               <button className={styles.actionIcon} onClick={handleRestore} title="Restore">
                 <FiRotateCcw />
               </button>
-              {isOwner && (
+              {canDelete && (
                 <button className={`${styles.actionIcon} ${styles.deleteIcon}`} onClick={handleDelete} title="Delete">
                   <FiTrash2 />
                 </button>
@@ -173,15 +182,17 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
               <button className={styles.actionIcon} onClick={handleComment} title="Add Image">
                 <FiImage />
               </button>
-              {isOwner && !isDone && (
+              {canEdit && !isDone && (
                 <>
                   <button className={styles.actionIcon} onClick={handleEdit} title="Edit">
                     <FiEdit2 />
                   </button>
-                  <button className={`${styles.actionIcon} ${styles.deleteIcon}`} onClick={handleDelete} title="Delete">
-                    <FiTrash2 />
-                  </button>
                 </>
+              )}
+              {canDelete && !isDone && (
+                <button className={`${styles.actionIcon} ${styles.deleteIcon}`} onClick={handleDelete} title="Delete">
+                  <FiTrash2 />
+                </button>
               )}
             </>
           )}

@@ -3,8 +3,8 @@ import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCal
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
-import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, updateSubtask } from '../../lib/api'
-import type { TaskComment } from '../../types/database'
+import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, updateSubtask, getProfile, createNotification } from '../../lib/api'
+import type { TaskComment, Profile } from '../../types/database'
 import styles from './TaskDetailPanel.module.css'
 
 export default function TaskDetailPanel() {
@@ -12,6 +12,7 @@ export default function TaskDetailPanel() {
   const { user, profile } = useAuth()
   const { showToast } = useToast()
   const [comments, setComments] = useState<TaskComment[]>([])
+  const [commentProfiles, setCommentProfiles] = useState<Record<string, Profile>>({})
   const [commentInput, setCommentInput] = useState('')
   const [commentImage, setCommentImage] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
@@ -35,7 +36,53 @@ export default function TaskDetailPanel() {
 
   const loadComments = async (taskId: string) => {
     const { data } = await getTaskComments(taskId)
-    if (data) setComments(data)
+    console.log('[loadComments] Comments loaded:', data?.length)
+
+    if (data) {
+      setComments(data)
+
+      // Fetch profiles for all comment authors
+      const userIds = [...new Set(data.map(c => c.user_id))]
+      console.log('[loadComments] User IDs to fetch:', userIds)
+
+      const profiles: Record<string, Profile> = {}
+
+      for (const userId of userIds) {
+        console.log('[loadComments] Fetching profile for:', userId)
+        const { data: profileData, error } = await getProfile(userId)
+        console.log('[loadComments] Profile result:', {
+          userId,
+          hasData: !!profileData,
+          fullName: profileData?.full_name,
+          email: profileData?.email,
+          error: error?.message || error
+        })
+
+        if (profileData) {
+          profiles[userId] = profileData
+        }
+      }
+
+      console.log('[loadComments] All profiles loaded:', Object.keys(profiles).length, 'profiles')
+      setCommentProfiles(profiles)
+    }
+  }
+
+  // Get display name for a comment author
+  const getCommentAuthorName = (userId: string) => {
+    const authorProfile = commentProfiles[userId]
+
+    // If profile found, use it
+    if (authorProfile?.full_name) return authorProfile.full_name
+    if (authorProfile?.email) return authorProfile.email.split('@')[0]
+
+    // Fallback: if this is the current user, use their info
+    if (user?.id === userId) {
+      return profile?.full_name || user?.email?.split('@')[0] || 'You'
+    }
+
+    // Last resort: use short user ID
+    return `User ${userId.slice(0, 6)}`
   }
 
   const handleCommentImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +112,12 @@ export default function TaskDetailPanel() {
 
   const handleAddComment = async () => {
     if (!task || !user || (!commentInput.trim() && !commentImage)) return
+
+    console.log('[Comment] Starting to add comment...')
+    console.log('[Comment] Task:', task.id, 'Title:', task.title)
+    console.log('[Comment] Task owner:', task.user_id)
+    console.log('[Comment] Current user:', user.id)
+    console.log('[Comment] Assigned to:', task.assigned_to)
 
     setLoading(true)
 
@@ -106,6 +159,45 @@ export default function TaskDetailPanel() {
         fileInputRef.current.value = ''
       }
       showToast('Comment added!', 'success')
+
+      // Send notifications to task owner and assignees (except commenter)
+      const commenterName = profile?.full_name || user?.email?.split('@')[0] || 'Someone'
+      const notifyUserIds = new Set<string>()
+
+      // Add task owner (if not commenter)
+      if (task.user_id && task.user_id !== user.id) {
+        notifyUserIds.add(task.user_id)
+      }
+
+      // Add assignees (if not commenter)
+      if (task.task_assignees) {
+        task.task_assignees.forEach(a => {
+          if (a.user_id !== user.id) {
+            notifyUserIds.add(a.user_id)
+          }
+        })
+      }
+
+      console.log('[Comment] Task owner:', task.user_id)
+      console.log('[Comment] Current user:', user.id)
+      console.log('[Comment] Task assignees:', task.task_assignees)
+      console.log('[Comment] Assignees count:', task.task_assignees?.length)
+      console.log('[Comment] Users to notify:', Array.from(notifyUserIds), 'Commenter:', user.id)
+
+      // Send notification to each user
+      for (const notifyUserId of notifyUserIds) {
+        console.log('[Comment] Creating notification for:', notifyUserId)
+        const { data: notifData, error: notifError } = await createNotification({
+          user_id: notifyUserId,
+          type: 'mention',
+          title: 'New Comment',
+          message: `${commenterName} commented on "${task.title}"`,
+          is_read: false,
+          task_id: task.id,
+          board_id: task.board_id
+        })
+        console.log('[Comment] Notification result:', { notifData, notifError })
+      }
     } else {
       showToast('Failed to add comment', 'error')
     }
@@ -276,14 +368,16 @@ export default function TaskDetailPanel() {
 
             <div className={styles.comments}>
               {comments.length > 0 ? (
-                comments.map(comment => (
+                comments.map(comment => {
+                  const authorName = getCommentAuthorName(comment.user_id)
+                  return (
                   <div key={comment.id} className={styles.comment}>
                     <div className={styles.commentAvatar}>
-                      {displayName.charAt(0).toUpperCase()}
+                      {authorName.charAt(0).toUpperCase()}
                     </div>
                     <div className={styles.commentBody}>
                       <div className={styles.commentHeader}>
-                        <span className={styles.commentAuthor}>{displayName}</span>
+                        <span className={styles.commentAuthor}>{authorName}</span>
                         <span className={styles.commentTime}>{formatTime(comment.created_at)}</span>
                       </div>
                       {comment.content && (
@@ -305,7 +399,8 @@ export default function TaskDetailPanel() {
                       <FiTrash2 />
                     </button>
                   </div>
-                ))
+                  )
+                })
               ) : (
                 <p className={styles.noComments}>No comments yet</p>
               )}

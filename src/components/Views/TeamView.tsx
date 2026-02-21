@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react'
-import { FiPlus, FiMail, FiShield, FiEdit2, FiTrash2, FiX, FiUsers, FiUserCheck, FiUser, FiSearch, FiCheck, FiAlertCircle } from 'react-icons/fi'
+import { useState, useEffect, useCallback } from 'react'
+import { FiPlus, FiMail, FiShield, FiEdit2, FiTrash2, FiX, FiUsers, FiUserCheck, FiUser, FiSearch, FiCheck, FiAlertCircle, FiClock, FiSend } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
-import { getTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember, getProfileByEmail } from '../../lib/api'
-import type { TeamMember } from '../../types/database'
+import { getTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember, getProfileByEmail, getSentInvitations, createTeamInvitation, cancelTeamInvitation } from '../../lib/api'
+import type { TeamMember, TeamInvitation } from '../../types/database'
 import styles from './Views.module.css'
 
 export default function TeamView() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [members, setMembers] = useState<TeamMember[]>([])
+  const [invitations, setInvitations] = useState<TeamInvitation[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'admin' | 'member' | 'viewer'>('all')
+  const [filter, setFilter] = useState<'all' | 'admin' | 'member' | 'viewer' | 'pending'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
@@ -21,52 +22,72 @@ export default function TeamView() {
     role: 'member' as 'admin' | 'member' | 'viewer'
   })
 
-  useEffect(() => {
-    loadTeamMembers()
-  }, [user])
-
-  // Refresh saat window focus (untuk update linking status)
-  useEffect(() => {
-    const handleFocus = () => {
-      loadTeamMembers()
-    }
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [user])
-
-  const loadTeamMembers = async () => {
-    if (!user) return
+  const loadTeamMembers = useCallback(async (userId: string) => {
+    console.log('[TeamView] Loading team members for user:', userId)
     setLoading(true)
 
-    const { data, error } = await getTeamMembers(user.id)
+    // Load team members
+    const { data, error } = await getTeamMembers(userId)
 
-    if (!error && data && data.length > 0) {
-      // Try to link team members to auth users
-      const linkedMembers = await Promise.all(
-        data.map(async (member) => {
-          // If already linked, return as is
-          if (member.auth_user_id) return member
+    console.log('[TeamView] getTeamMembers result:', { data: data?.length, error })
 
-          // Try to find auth user by email
-          const { data: profile } = await getProfileByEmail(member.email)
-
-          if (profile) {
-            // Update team member with auth_user_id
-            const { error: updateError } = await updateTeamMember(member.id, { auth_user_id: profile.id })
-            if (!updateError) {
-              return { ...member, auth_user_id: profile.id }
-            }
-          }
-          return member
-        })
-      )
-      setMembers(linkedMembers)
-    } else if (data) {
-      setMembers(data)
+    // Load pending invitations
+    const { data: invitationsData } = await getSentInvitations(userId)
+    if (invitationsData) {
+      setInvitations(invitationsData.filter(i => i.status === 'pending'))
     }
 
-    setLoading(false)
-  }
+    if (!error && data) {
+      // Tampilkan data dulu (fast initial load)
+      setMembers(data)
+      setLoading(false)
+
+      // Linking di background hanya untuk member yang belum linked
+      // dan belum pernah dicoba linking (cache di localStorage)
+      const linkingCache = JSON.parse(localStorage.getItem('team_linking_cache') || '{}')
+
+      const unlinkedMembers = data.filter(m => !m.auth_user_id && !linkingCache[m.id])
+
+      if (unlinkedMembers.length > 0) {
+        // Mark as attempted to prevent retry
+        unlinkedMembers.forEach(m => {
+          linkingCache[m.id] = true
+        })
+        localStorage.setItem('team_linking_cache', JSON.stringify(linkingCache))
+
+        // Do linking in background (non-blocking)
+        Promise.all(
+          unlinkedMembers.map(async (member) => {
+            const { data: profile } = await getProfileByEmail(member.email)
+            if (profile) {
+              await updateTeamMember(member.id, { auth_user_id: profile.id })
+              return { ...member, auth_user_id: profile.id }
+            }
+            return member
+          })
+        ).then(linkedMembers => {
+          // Update state dengan hasil linking
+          setMembers(prev => prev.map(m => {
+            const linked = linkedMembers.find(l => l.id === m.id && l.auth_user_id)
+            return linked || m
+          }))
+        })
+      }
+    } else {
+      setLoading(false)
+    }
+  }, [])
+
+  // Load data saat component mount
+  useEffect(() => {
+    console.log('[TeamView] useEffect - user:', !!user, 'userId:', user?.id)
+
+    if (user?.id) {
+      loadTeamMembers(user.id)
+    } else {
+      setLoading(false)
+    }
+  }, [user?.id, loadTeamMembers])
 
   const openCreateModal = () => {
     setEditingMember(null)
@@ -89,6 +110,7 @@ export default function TeamView() {
     if (!user || !formData.name.trim() || !formData.email.trim()) return
 
     if (editingMember) {
+      // Update existing member
       const { data, error } = await updateTeamMember(editingMember.id, {
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -99,20 +121,32 @@ export default function TeamView() {
         showToast('Member updated!', 'success')
       }
     } else {
-      const { data, error } = await createTeamMember({
-        user_id: user.id,
+      // Create invitation (not directly adding member)
+      const { data, error } = await createTeamInvitation({
+        team_owner_id: user.id,
         name: formData.name.trim(),
-        email: formData.email.trim(),
-        role: formData.role,
-        avatar_url: null,
-        status: 'offline'
+        email: formData.email.trim().toLowerCase(),
+        role: formData.role
       })
+
       if (!error && data) {
-        setMembers([...members, data])
-        showToast('Member invited!', 'success')
+        setInvitations([...invitations, data])
+        showToast('Invitation sent! Waiting for acceptance.', 'success')
+      } else if (error) {
+        showToast(error.message || 'Failed to send invitation', 'error')
       }
     }
     setShowModal(false)
+  }
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!confirm('Cancel this invitation?')) return
+
+    const { error } = await cancelTeamInvitation(invitationId)
+    if (!error) {
+      setInvitations(invitations.filter(i => i.id !== invitationId))
+      showToast('Invitation cancelled', 'info')
+    }
   }
 
   const handleDelete = async (memberId: string) => {
@@ -131,6 +165,12 @@ export default function TeamView() {
     return matchesFilter && matchesSearch
   })
 
+  const filteredInvitations = invitations.filter(i => {
+    const matchesSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      i.email.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesSearch
+  })
+
   const roleConfig = {
     admin: { label: 'Admin', color: 'red', icon: FiShield },
     member: { label: 'Member', color: 'blue', icon: FiUser },
@@ -139,6 +179,7 @@ export default function TeamView() {
 
   const stats = {
     total: members.length,
+    pending: invitations.length,
     online: members.filter(m => m.status === 'online').length,
     admins: members.filter(m => m.role === 'admin').length
   }
@@ -147,6 +188,19 @@ export default function TeamView() {
     return (
       <div className={styles.teamView}>
         <div className={styles.loading}>Loading team members...</div>
+      </div>
+    )
+  }
+
+  // Jika user belum login setelah auth initialized
+  if (!user) {
+    return (
+      <div className={styles.teamView}>
+        <div className={styles.emptyTeam}>
+          <FiUsers />
+          <h3>Please login to view team members</h3>
+          <p>You need to be logged in to manage your team</p>
+        </div>
       </div>
     )
   }
@@ -178,6 +232,15 @@ export default function TeamView() {
           <div className={styles.teamStatInfo}>
             <span className={styles.teamStatValue}>{stats.total}</span>
             <span className={styles.teamStatLabel}>Total Members</span>
+          </div>
+        </div>
+        <div className={styles.teamStatCard}>
+          <div className={styles.teamStatIcon}>
+            <FiClock />
+          </div>
+          <div className={styles.teamStatInfo}>
+            <span className={styles.teamStatValue}>{stats.pending}</span>
+            <span className={styles.teamStatLabel}>Pending Invites</span>
           </div>
         </div>
         <div className={styles.teamStatCard}>
@@ -219,6 +282,12 @@ export default function TeamView() {
             All ({members.length})
           </button>
           <button
+            className={`${styles.teamFilterTab} ${filter === 'pending' ? styles.active : ''}`}
+            onClick={() => setFilter('pending')}
+          >
+            <FiClock /> Pending ({invitations.length})
+          </button>
+          <button
             className={`${styles.teamFilterTab} ${filter === 'admin' ? styles.active : ''}`}
             onClick={() => setFilter('admin')}
           >
@@ -239,7 +308,50 @@ export default function TeamView() {
         </div>
       </div>
 
-      {/* Members Grid */}
+      {/* Pending Invitations */}
+      {filter === 'pending' && (
+        <div className={styles.invitationsSection}>
+          <h3><FiSend /> Pending Invitations</h3>
+          {filteredInvitations.length === 0 ? (
+            <div className={styles.emptyInvitations}>
+              <FiClock />
+              <p>No pending invitations</p>
+            </div>
+          ) : (
+            <div className={styles.invitationsGrid}>
+              {filteredInvitations.map(invitation => (
+                <div key={invitation.id} className={styles.invitationCard}>
+                  <div className={styles.invitationAvatar}>
+                    <span>{invitation.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className={styles.invitationInfo}>
+                    <h4>{invitation.name}</h4>
+                    <p><FiMail /> {invitation.email}</p>
+                    <span className={`${styles.invitationRole} ${styles[invitation.role]}`}>
+                      {invitation.role.charAt(0).toUpperCase() + invitation.role.slice(1)}
+                    </span>
+                  </div>
+                  <div className={styles.invitationActions}>
+                    <span className={styles.pendingBadge}>
+                      <FiClock /> Waiting...
+                    </span>
+                    <button
+                      className={styles.cancelBtn}
+                      onClick={() => handleCancelInvitation(invitation.id)}
+                      title="Cancel invitation"
+                    >
+                      <FiX />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Members Grid - only show when not viewing pending */}
+      {filter !== 'pending' && (
       <div className={styles.membersGrid}>
         {filteredMembers.map(member => {
           const RoleIcon = roleConfig[member.role].icon
@@ -289,9 +401,10 @@ export default function TeamView() {
           <span>Invite New Member</span>
         </div>
       </div>
+      )}
 
       {/* Empty State */}
-      {filteredMembers.length === 0 && !loading && (
+      {filteredMembers.length === 0 && filter !== 'pending' && !loading && (
         <div className={styles.emptyTeam}>
           <FiUsers />
           <h3>No team members found</h3>

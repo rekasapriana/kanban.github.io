@@ -55,7 +55,7 @@ export const getProfile = async (userId: string) => {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
   return { data, error }
 }
 
@@ -871,11 +871,13 @@ export const getNotifications = async (userId: string) => {
 }
 
 export const createNotification = async (notification: NotificationInsert) => {
+  console.log('[createNotification] Inserting:', JSON.stringify(notification))
   const { data, error } = await supabase
     .from('notifications')
     .insert(notification)
     .select()
     .single()
+  console.log('[createNotification] Result:', { data, error })
   return { data, error }
 }
 
@@ -1070,4 +1072,135 @@ export const updateTaskAssignees = async (taskId: string, userIds: string[]) => 
   for (const userId of userIds) {
     await addTaskAssignee(taskId, userId)
   }
+}
+
+// ==================== TEAM INVITATIONS ====================
+
+// Get pending invitations for current user (by email)
+export const getPendingInvitations = async (email: string) => {
+  const { data, error } = await supabase
+    .from('team_invitations')
+    .select('*')
+    .eq('email', email)
+    .eq('status', 'pending')
+    .order('invited_at', { ascending: false })
+
+  return { data, error }
+}
+
+// Get all invitations sent by a user (team owner)
+export const getSentInvitations = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('team_invitations')
+    .select('*')
+    .eq('team_owner_id', userId)
+    .order('invited_at', { ascending: false })
+
+  return { data, error }
+}
+
+// Create a new invitation
+export const createTeamInvitation = async (invitation: {
+  team_owner_id: string
+  email: string
+  name: string
+  role: 'admin' | 'member' | 'viewer'
+}) => {
+  console.log('[createTeamInvitation] Creating invitation:', invitation)
+
+  // Check if already invited or already a member
+  const { data: existingInvitation, error: checkError } = await supabase
+    .from('team_invitations')
+    .select('*')
+    .eq('email', invitation.email)
+    .eq('team_owner_id', invitation.team_owner_id)
+    .eq('status', 'pending')
+    .maybeSingle()
+
+  console.log('[createTeamInvitation] Existing check:', { existingInvitation, checkError })
+
+  if (existingInvitation) {
+    return { data: null, error: { message: 'User already invited' } }
+  }
+
+  const { data, error } = await supabase
+    .from('team_invitations')
+    .insert(invitation)
+    .select()
+    .single()
+
+  console.log('[createTeamInvitation] Insert result:', { data, error })
+
+  return { data, error }
+}
+
+// Accept an invitation
+export const acceptTeamInvitation = async (invitationId: string) => {
+  // Get the invitation
+  const { data: invitation, error: fetchError } = await supabase
+    .from('team_invitations')
+    .select('*')
+    .eq('id', invitationId)
+    .single()
+
+  if (fetchError || !invitation) {
+    return { error: fetchError || { message: 'Invitation not found' } }
+  }
+
+  // Update invitation status
+  const { error: updateError } = await supabase
+    .from('team_invitations')
+    .update({
+      status: 'accepted',
+      responded_at: new Date().toISOString()
+    })
+    .eq('id', invitationId)
+
+  if (updateError) {
+    return { error: updateError }
+  }
+
+  // Get current user's ID to link
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Add to team_members with auth_user_id linked
+  const { data: member, error: memberError } = await supabase
+    .from('team_members')
+    .insert({
+      user_id: invitation.team_owner_id,
+      name: invitation.name,
+      email: invitation.email,
+      role: invitation.role,
+      status: 'online',
+      auth_user_id: user?.id || null
+    })
+    .select()
+    .single()
+
+  console.log('[acceptTeamInvitation] Created member:', { member, memberError, auth_user_id: user?.id })
+
+  return { data: member, error: memberError }
+}
+
+// Decline an invitation
+export const declineTeamInvitation = async (invitationId: string) => {
+  const { error } = await supabase
+    .from('team_invitations')
+    .update({
+      status: 'declined',
+      responded_at: new Date().toISOString()
+    })
+    .eq('id', invitationId)
+
+  return { error }
+}
+
+// Cancel/Delete an invitation (by team owner)
+export const cancelTeamInvitation = async (invitationId: string) => {
+  const { error } = await supabase
+    .from('team_invitations')
+    .delete()
+    .eq('id', invitationId)
+
+  return { error }
 }

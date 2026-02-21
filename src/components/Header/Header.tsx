@@ -1,5 +1,6 @@
 import { FiColumns, FiPlus, FiMenu } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
+import NotificationBell from '../Notifications/NotificationBell'
 import styles from './Header.module.css'
 
 interface HeaderProps {
@@ -30,6 +31,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className={styles.headerRight}>
+        <NotificationBell />
         <button
           className={styles.addBtn}
           onClick={() => openModal()}

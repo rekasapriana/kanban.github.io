@@ -1,20 +1,34 @@
 import { useState, useEffect } from 'react'
-import { FiBell, FiCheck, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiInfo, FiSearch } from 'react-icons/fi'
+import { FiBell, FiCheck, FiTrash2, FiUser, FiCheckCircle, FiAlertCircle, FiInfo, FiSearch, FiUserPlus } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
 import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  deleteNotification
+  deleteNotification,
+  getPendingInvitations,
+  acceptTeamInvitation,
+  declineTeamInvitation
 } from '../../lib/api'
-import type { Notification } from '../../types/database'
+import type { Notification, TeamInvitation } from '../../types/database'
 import styles from './Views.module.css'
+
+type CombinedNotification = (Notification & { isInvitation?: false }) | {
+  id: string
+  type: 'invitation'
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+  isInvitation: true
+  invitationData: TeamInvitation
+}
 
 export default function NotificationsView() {
   const { user } = useAuth()
   const { showToast } = useToast()
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<CombinedNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -27,11 +41,55 @@ export default function NotificationsView() {
   const loadNotifications = async () => {
     if (!user) return
     setLoading(true)
-    const { data } = await getNotifications(user.id)
-    if (data) {
-      setNotifications(data)
-    }
+
+    // Load regular notifications
+    const { data: notifData, error: notifError } = await getNotifications(user.id)
+    console.log('[Notifications] Loaded notifications:', notifData, notifError)
+
+    // Load team invitations
+    const { data: invitations, error: invError } = await getPendingInvitations(user.email || '')
+    console.log('[Notifications] Loaded invitations:', invitations, invError)
+
+    // Combine both
+    const combined: CombinedNotification[] = [
+      ...(notifData || []).map(n => ({ ...n, isInvitation: false as const })),
+      ...(invitations || []).map(inv => ({
+        id: inv.id,
+        type: 'invitation' as const,
+        title: 'Team Invitation',
+        message: `${inv.name} invited you to join their team as ${inv.role}`,
+        is_read: false,
+        created_at: inv.invited_at,
+        isInvitation: true as const,
+        invitationData: inv
+      }))
+    ]
+
+    // Sort by date
+    combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    setNotifications(combined)
     setLoading(false)
+  }
+
+  const handleAcceptInvitation = async (invitationId: string) => {
+    const { error } = await acceptTeamInvitation(invitationId)
+    if (!error) {
+      showToast('You joined the team!', 'success')
+      loadNotifications()
+    } else {
+      showToast('Failed to accept invitation', 'error')
+    }
+  }
+
+  const handleDeclineInvitation = async (invitationId: string) => {
+    const { error } = await declineTeamInvitation(invitationId)
+    if (!error) {
+      showToast('Invitation declined', 'info')
+      setNotifications(notifications.filter(n => n.id !== invitationId))
+    } else {
+      showToast('Failed to decline invitation', 'error')
+    }
   }
 
   const filteredNotifications = notifications.filter(n => {
@@ -64,20 +122,24 @@ export default function NotificationsView() {
     showToast('Notification deleted!', 'success')
   }
 
-  const getIcon = (type: Notification['type']) => {
+  const getIcon = (type: Notification['type'] | 'invitation') => {
     switch (type) {
       case 'task': return FiCheckCircle
       case 'reminder': return FiAlertCircle
       case 'mention': return FiUser
+      case 'comment': return FiMessageCircle
+      case 'invitation': return FiUserPlus
       default: return FiInfo
     }
   }
 
-  const typeColors = {
+  const typeColors: Record<string, string> = {
     task: 'green',
     system: 'blue',
     mention: 'purple',
     reminder: 'yellow',
+    invitation: 'indigo',
+    comment: 'cyan',
   }
 
   const formatTime = (dateStr: string) => {
@@ -177,7 +239,9 @@ export default function NotificationsView() {
           onChange={e => setTypeFilter(e.target.value)}
         >
           <option value="all">All Types</option>
+          <option value="invitation">Invitations</option>
           <option value="task">Tasks</option>
+          <option value="comment">Comments</option>
           <option value="reminder">Reminders</option>
           <option value="mention">Mentions</option>
           <option value="system">System</option>
@@ -189,6 +253,43 @@ export default function NotificationsView() {
         {filteredNotifications.length > 0 ? (
           filteredNotifications.map(notification => {
             const Icon = getIcon(notification.type)
+
+            // Special rendering for invitations
+            if (notification.isInvitation) {
+              return (
+                <div
+                  key={notification.id}
+                  className={`${styles.notifCard} ${styles.invitationCard}`}
+                >
+                  <div className={`${styles.notifIcon} ${styles.indigo}`}>
+                    <Icon />
+                  </div>
+                  <div className={styles.notifContent}>
+                    <h4>{notification.title}</h4>
+                    <p>{notification.message}</p>
+                    <span className={styles.notifTime}>{formatTime(notification.created_at)}</span>
+                  </div>
+                  <div className={styles.invitationActions}>
+                    <button
+                      className={styles.acceptBtn}
+                      onClick={() => handleAcceptInvitation(notification.id)}
+                      title="Accept"
+                    >
+                      <FiCheck /> Accept
+                    </button>
+                    <button
+                      className={styles.declineBtn}
+                      onClick={() => handleDeclineInvitation(notification.id)}
+                      title="Decline"
+                    >
+                      <FiTrash2 /> Decline
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+
+            // Regular notification
             return (
               <div
                 key={notification.id}

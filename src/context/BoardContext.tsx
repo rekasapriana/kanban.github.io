@@ -5,6 +5,29 @@ import type { Task, TaskInsert } from '../types/database'
 import { useAuth } from './AuthContext'
 import { useToast } from '../hooks/useToast'
 
+// Helper to send task assignment notifications
+const sendAssignmentNotifications = async (
+  assigneeIds: string[],
+  taskId: string,
+  taskTitle: string,
+  assignerName: string,
+  boardId: string
+) => {
+  console.log('[Notifications] Sending to users:', assigneeIds)
+  for (const userId of assigneeIds) {
+    const { data, error } = await api.createNotification({
+      user_id: userId,
+      type: 'task',
+      title: 'New Task Assignment',
+      message: `${assignerName} assigned you to "${taskTitle}"`,
+      is_read: false,
+      task_id: taskId,
+      board_id: boardId
+    })
+    console.log('[Notifications] Result for', userId, ':', { data, error })
+  }
+}
+
 const initialState: BoardState = {
   board: null,
   columns: [],
@@ -108,7 +131,7 @@ interface BoardContextType {
 const BoardContext = createContext<BoardContextType | undefined>(undefined)
 
 export function BoardProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { showToast } = useToast()
   const [state, dispatch] = useReducer(boardReducer, initialState)
 
@@ -167,19 +190,49 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
   // Load tasks
   const loadTasks = useCallback(async () => {
-    if (!state.board || !user) {
+    const currentBoard = state.board
+
+    if (!currentBoard || !user) {
       console.log('[loadTasks] No board or user, skipping')
       return
     }
 
-    console.log('[loadTasks] Loading tasks for board:', state.board.id)
+    console.log('[loadTasks] ============ DEBUG INFO ============')
+    console.log('[loadTasks] Current user ID:', user.id)
+    console.log('[loadTasks] Board ID:', currentBoard.id)
+
     try {
+      // FETCH COLUMNS FRESH - avoid race condition
+      console.log('[loadTasks] Fetching columns fresh...')
+      const { data: freshColumns, error: colsError } = await api.getColumns(currentBoard.id)
+
+      if (colsError || !freshColumns || freshColumns.length === 0) {
+        console.error('[loadTasks] No columns found!')
+        dispatch({ type: 'SET_LOADING', payload: false })
+        return
+      }
+
+      console.log('[loadTasks] Columns loaded:', freshColumns.map(c => c.title))
+
+      // Update state columns if different
+      if (freshColumns.length !== state.columns.length) {
+        dispatch({ type: 'SET_COLUMNS', payload: freshColumns })
+      }
+
       // Load tasks from user's own board
-      const { data: boardTasks, error: boardError } = await api.getTasks(state.board.id)
+      const { data: boardTasks, error: boardError } = await api.getTasks(currentBoard.id)
 
       if (boardError) {
         console.error('[loadTasks] Board tasks error:', boardError)
         throw boardError
+      }
+
+      console.log('[loadTasks] Board tasks loaded:', boardTasks?.length || 0)
+      if (boardTasks && boardTasks.length > 0) {
+        console.log('[loadTasks] ALL TASKS WITH USER_ID:')
+        boardTasks.forEach(t => {
+          console.log(`  - "${t.title}" | user_id: ${t.user_id} | owner: ${t.user_id === user.id ? 'YES' : 'NO'}`)
+        })
       }
 
       // Load tasks assigned to current user (from other boards)
@@ -187,33 +240,43 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
       if (assignedError) {
         console.error('[loadTasks] Assigned tasks error:', assignedError)
-        // Don't throw, just log - assigned tasks are optional
       }
 
       // Combine tasks, avoiding duplicates
       const allTasks = [...(boardTasks || [])]
       const boardTaskIds = new Set(allTasks.map(t => t.id))
 
-      if (assignedTasks) {
-        // Get column mapping by title
-        const columnMap = new Map(state.columns.map(c => [c.title.toLowerCase(), c.id]))
+      if (assignedTasks && assignedTasks.length > 0) {
+        console.log('[loadTasks] Assigned tasks found:', assignedTasks.length)
+
+        // Get column mapping by title using FRESH columns
+        const columnMap = new Map(freshColumns.map(c => [c.title.toLowerCase(), c.id]))
+        console.log('[loadTasks] Column map:', Object.fromEntries(columnMap))
 
         for (const task of assignedTasks) {
+          console.log(`[loadTasks] Processing assigned task: "${task.title}"`)
+
           if (!boardTaskIds.has(task.id)) {
             // Get the original column title from the task's board
-            const { data: originalColumn } = await api.getColumnById(task.column_id)
+            const { data: originalColumn, error: colError } = await api.getColumnById(task.column_id)
+            console.log(`[loadTasks] Original column:`, originalColumn?.title, 'error:', colError)
 
             if (originalColumn) {
               // Map to equivalent column in current board
               const mappedColumnId = columnMap.get(originalColumn.title.toLowerCase())
+              console.log(`[loadTasks] Mapped column ID: ${mappedColumnId}`)
 
               if (mappedColumnId) {
+                console.log(`[loadTasks] Adding task "${task.title}" with mapped column`)
                 allTasks.push({ ...task, column_id: mappedColumnId })
               } else {
                 // Fallback to "To Do" column
-                const todoColumn = state.columns.find(c => c.title.toLowerCase() === 'to do')
+                const todoColumn = freshColumns.find(c => c.title.toLowerCase() === 'to do')
                 if (todoColumn) {
+                  console.log(`[loadTasks] Adding task "${task.title}" to To Do (fallback)`)
                   allTasks.push({ ...task, column_id: todoColumn.id })
+                } else {
+                  console.log(`[loadTasks] ERROR: No To Do column found!`)
                 }
               }
             }
@@ -221,7 +284,35 @@ export function BoardProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('[loadTasks] Loaded tasks:', allTasks.length, '(board:', boardTasks?.length || 0, ', assigned:', assignedTasks?.length || 0, ')')
+      console.log('[loadTasks] Total tasks loaded:', allTasks.length)
+
+      // Debug: Check column mapping
+      console.log('[loadTasks] TASKS WITH COLUMNS:')
+      allTasks.forEach(t => {
+        const col = freshColumns.find(c => c.id === t.column_id)
+        console.log(`  "${t.title}" | column: ${col?.title || 'NOT FOUND!'}`)
+      })
+
+      // Fix: Reassign tasks with invalid column_id to "To Do"
+      const todoColumn = freshColumns.find(c => c.title.toLowerCase() === 'to do')
+      if (todoColumn) {
+        const tasksWithInvalidColumn = allTasks.filter(t => {
+          const col = freshColumns.find(c => c.id === t.column_id)
+          return !col
+        })
+
+        if (tasksWithInvalidColumn.length > 0) {
+          console.log('[loadTasks] FIXING tasks with invalid column_id:', tasksWithInvalidColumn.length)
+          for (const task of tasksWithInvalidColumn) {
+            console.log(`[loadTasks] Moving "${task.title}" to "To Do" column`)
+            await api.updateTask(task.id, { column_id: todoColumn.id })
+            task.column_id = todoColumn.id
+          }
+        }
+      }
+
+      console.log('[loadTasks] ============ END DEBUG ============')
+
       dispatch({ type: 'SET_TASKS', payload: allTasks })
     } catch (error: any) {
       console.error('[loadTasks] Error:', error)
@@ -229,21 +320,24 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false })
     }
-  }, [state.board, user, showToast])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.board?.id, user?.id, showToast])
 
   // Initialize board on mount
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
+      console.log('[BoardContext] Initializing board for user:', user.id)
       loadBoard()
     }
-  }, [user, loadBoard])
+  }, [user?.id])
 
-  // Load tasks when board is set
+  // Load tasks when board AND columns are ready
   useEffect(() => {
-    if (state.board) {
+    if (state.board?.id && state.columns.length > 0 && user?.id) {
+      console.log('[BoardContext] Board and columns ready, loading tasks...')
       loadTasks()
     }
-  }, [state.board, loadTasks])
+  }, [state.board?.id, state.columns.length, user?.id])
 
   // Disable realtime for now - causes connection issues
   // useEffect(() => {
@@ -312,11 +406,27 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
         if (error) throw error
 
+        // Get current assignees to find new ones
+        const currentAssigneeIds = state.editingTask.task_assignees?.map(a => a.user_id) || []
+        const newAssigneeIds = assigneeIds.filter(id => !currentAssigneeIds.includes(id))
+
         // Update tags, labels, subtasks and assignees
         await api.updateTags(state.editingTask.id, tags)
         await api.updateTaskLabels(state.editingTask.id, labelIds)
         await api.updateSubtasks(state.editingTask.id, subtasks)
         await api.updateTaskAssignees(state.editingTask.id, assigneeIds)
+
+        // Send notifications to new assignees only
+        if (newAssigneeIds.length > 0) {
+          const assignerName = profile?.full_name || user?.email?.split('@')[0] || 'Someone'
+          await sendAssignmentNotifications(
+            newAssigneeIds,
+            state.editingTask.id,
+            task.title || state.editingTask.title,
+            assignerName,
+            state.board!.id
+          )
+        }
 
         await loadTasks()
         showToast('Task updated!', 'success')
@@ -367,6 +477,18 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
         // Add assignees
         await api.updateTaskAssignees(data.id, assigneeIds)
+
+        // Send notifications to assignees
+        if (assigneeIds.length > 0) {
+          const assignerName = profile?.full_name || user?.email?.split('@')[0] || 'Someone'
+          await sendAssignmentNotifications(
+            assigneeIds,
+            data.id,
+            task.title || 'Untitled Task',
+            assignerName,
+            state.board!.id
+          )
+        }
 
         await loadTasks()
         showToast('Task created!', 'success')

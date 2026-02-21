@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BoardProvider } from './context/BoardContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
@@ -49,25 +49,28 @@ function MainContent() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Map views to components
-  const viewComponents: Record<string, React.ReactNode> = {
-    'dashboard': <DashboardView />,
-    'board': <Board />,
-    'my-tasks': <MyTasksView />,
-    'calendar': <CalendarView />,
-    'projects': <ProjectsView />,
-    'labels': <LabelsView />,
-    'starred': <StarredView />,
-    'archive': <ArchiveView />,
-    'team': <TeamView />,
-    'reports': <ReportsView />,
-    'notifications': <NotificationsView />,
-    'settings': <SettingsView />,
-    'help': <HelpView />,
-  }
-
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
   const closeSidebar = () => setSidebarOpen(false)
+
+  // Render view berdasarkan currentView dengan key untuk force remount
+  const renderView = useMemo(() => {
+    switch (currentView) {
+      case 'dashboard': return <DashboardView key="dashboard" />
+      case 'board': return <Board key="board" />
+      case 'my-tasks': return <MyTasksView key="my-tasks" />
+      case 'calendar': return <CalendarView key="calendar" />
+      case 'projects': return <ProjectsView key="projects" />
+      case 'labels': return <LabelsView key="labels" />
+      case 'starred': return <StarredView key="starred" />
+      case 'archive': return <ArchiveView key="archive" />
+      case 'team': return <TeamView key="team" />
+      case 'reports': return <ReportsView key="reports" />
+      case 'notifications': return <NotificationsView key="notifications" />
+      case 'settings': return <SettingsView key="settings" />
+      case 'help': return <HelpView key="help" />
+      default: return <Board key="board-default" />
+    }
+  }, [currentView])
 
   return (
     <div className={styles.appLayout}>
@@ -81,7 +84,7 @@ function MainContent() {
         <Header onMenuClick={toggleSidebar} />
         <div className={styles.contentArea}>
           {currentView === 'board' && <StatsPanel />}
-          {viewComponents[currentView] || <Board />}
+          {renderView}
         </div>
         <TaskModal />
         <ShortcutsModal />

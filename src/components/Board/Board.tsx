@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { FiSearch, FiGrid, FiList } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
+import { useAuth } from '../../context/AuthContext'
 import Column from './Column'
 import TaskCard from './TaskCard'
 import TaskDetailPanel from '../TaskDetail/TaskDetailPanel'
@@ -19,6 +20,7 @@ import styles from './Board.module.css'
 
 export default function Board() {
   const { state, moveTask, openModal, closeDetailPanel, openDetailPanel, deleteTask, toggleShortcutsModal, toggleStatsPanel, setSearchQuery, setViewMode } = useBoard()
+  const { user } = useAuth()
   const { toggleTheme } = useTheme()
   const [activeTask, setActiveTask] = useState<string | null>(null)
 
@@ -46,6 +48,17 @@ export default function Board() {
     const taskId = active.id as string
     const overId = over.id as string
 
+    // Find the task being moved
+    const task = state.tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    // Check permission: only owner can move
+    const isOwner = task.user_id === user?.id
+    if (!isOwner) {
+      console.log('[Board] Move denied - user is not the task owner')
+      return
+    }
+
     // Find target column
     const targetColumn = state.columns.find(col => col.id === overId)
     if (!targetColumn) return
@@ -55,7 +68,7 @@ export default function Board() {
     const position = columnTasks.length
 
     moveTask(taskId, targetColumn.id, position)
-  }, [state.columns, state.tasks, moveTask])
+  }, [state.columns, state.tasks, moveTask, user?.id])
 
   // Keyboard shortcuts
   useEffect(() => {

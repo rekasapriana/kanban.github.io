@@ -165,11 +165,13 @@ export type TeamMemberUpdate = Partial<Pick<TeamMember, 'name' | 'email' | 'role
 export interface Notification {
   id: string
   user_id: string
-  type: 'task' | 'system' | 'mention' | 'reminder'
+  type: 'task' | 'system' | 'mention' | 'reminder' | 'comment'
   title: string
   message: string
   is_read: boolean
   created_at: string
+  task_id?: string | null
+  board_id?: string | null
 }
 
 export type NotificationInsert = Omit<Notification, 'id' | 'created_at'>
@@ -218,3 +220,19 @@ export interface TaskAttachment {
 }
 
 export type TaskAttachmentInsert = Omit<TaskAttachment, 'id' | 'created_at'>
+
+// ==================== TEAM INVITATIONS ====================
+export interface TeamInvitation {
+  id: string
+  team_owner_id: string
+  email: string
+  name: string
+  role: 'admin' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'declined'
+  invited_at: string
+  responded_at: string | null
+  created_at: string
+}
+
+export type TeamInvitationInsert = Omit<TeamInvitation, 'id' | 'invited_at' | 'responded_at' | 'created_at'>
+export type TeamInvitationUpdate = Partial<Pick<TeamInvitation, 'status' | 'responded_at'>>
