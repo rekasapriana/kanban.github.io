@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { FiEdit2, FiMoon, FiSun, FiHelpCircle, FiBarChart2, FiSettings, FiLogOut } from 'react-icons/fi'
+import { FiEdit2, FiMoon, FiSun, FiHelpCircle, FiBarChart2, FiSettings, FiUsers, FiLogOut } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useView } from '../../context/ViewContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -57,15 +57,28 @@ export default function UserMenu() {
           >
             <FiEdit2 /> Edit Profile
           </button>
-          <button
-            className={styles.userDropdownItem}
-            onClick={() => {
-              setView('reports')
-              setIsOpen(false)
-            }}
-          >
-            <FiBarChart2 /> Team Reports
-          </button>
+          <div className={styles.userDropdownDivider} />
+          <div className={styles.userDropdownSection}>
+            <span className={styles.userDropdownSectionTitle}>TEAM & REPORTS</span>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                setView('team')
+                setIsOpen(false)
+              }}
+            >
+              <FiUsers /> Team
+            </button>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                setView('reports')
+                setIsOpen(false)
+              }}
+            >
+              <FiBarChart2 /> Reports
+            </button>
+          </div>
           <div className={styles.userDropdownDivider} />
           <div className={styles.userDropdownSection}>
             <span className={styles.userDropdownSectionTitle}>PREFERENCES</span>
