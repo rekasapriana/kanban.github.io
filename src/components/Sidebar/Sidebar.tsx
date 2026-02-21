@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useView, ViewType } from '../../context/ViewContext'
 import {
@@ -14,12 +14,13 @@ import {
   FiLogOut,
   FiMoon,
   FiSun,
-  FiEdit2,
   FiX,
   FiUsers,
   FiBarChart2,
   FiBell,
-  FiGrid
+  FiGrid,
+  FiChevronDown,
+  FiPlus
 } from 'react-icons/fi'
 import { useTheme } from '../../context/ThemeContext'
 import styles from './Sidebar.module.css'
@@ -34,9 +35,11 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const { theme, toggleTheme } = useTheme()
   const { currentView, setView } = useView()
   const [isMobile, setIsMobile] = useState(false)
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const workspaceRef = useRef<HTMLDivElement>(null)
 
+  const companyName = "Kanban Ale Ale"
   const displayName = profile?.full_name || user?.user_metadata?.name || 'User'
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url
 
   // Check if mobile
   useEffect(() => {
@@ -46,6 +49,17 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Close workspace dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (workspaceRef.current && !workspaceRef.current.contains(event.target as Node)) {
+        setWorkspaceOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   // Main menu items
@@ -91,29 +105,47 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       )}
 
       <aside className={`${styles.sidebar} ${isMobile ? styles.mobileSidebar : ''} ${isMobile && isOpen ? styles.mobileOpen : ''}`}>
-        {/* Header */}
+        {/* Header - Workspace Selector */}
         <div className={styles.sidebarHeader}>
-          <button
-            className={styles.userInfo}
-            onClick={() => {
-              setView('settings')
-              if (isMobile && onClose) onClose()
-            }}
-          >
-            <div className={styles.userAvatar}>
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} />
-              ) : (
-                <span>{displayName?.charAt(0).toUpperCase() || 'U'}</span>
-              )}
-              <div className={styles.avatarEditOverlay}>
-                <FiEdit2 />
+          <div className={styles.workspaceSelector} ref={workspaceRef}>
+            <button
+              className={styles.workspaceBtn}
+              onClick={() => setWorkspaceOpen(!workspaceOpen)}
+            >
+              <div className={styles.workspaceIcon}>
+                K
               </div>
-            </div>
-            <div className={styles.userDetails}>
-              <span className={styles.userName}>{displayName}</span>
-            </div>
-          </button>
+              <div className={styles.workspaceInfo}>
+                <span className={styles.workspaceName}>{companyName}</span>
+                <span className={styles.workspacePlan}>Free Plan</span>
+              </div>
+              <FiChevronDown className={`${styles.chevron} ${workspaceOpen ? styles.chevronOpen : ''}`} />
+            </button>
+
+            {workspaceOpen && (
+              <div className={styles.workspaceDropdown}>
+                <div className={styles.workspaceDropdownHeader}>
+                  <span>{displayName}</span>
+                  <span className={styles.userEmail}>{user?.email}</span>
+                </div>
+                <div className={styles.workspaceDropdownDivider} />
+                <button className={styles.workspaceDropdownItem}>
+                  <FiPlus /> Add Workspace
+                </button>
+                <button className={styles.workspaceDropdownItem} onClick={() => {
+                  setView('settings')
+                  setWorkspaceOpen(false)
+                  if (isMobile && onClose) onClose()
+                }}>
+                  <FiSettings /> Settings
+                </button>
+                <div className={styles.workspaceDropdownDivider} />
+                <button className={styles.workspaceDropdownItem} onClick={signOutUser}>
+                  <FiLogOut /> Log Out
+                </button>
+              </div>
+            )}
+          </div>
           {isMobile && (
             <button className={styles.closeBtn} onClick={onClose}>
               <FiX />
