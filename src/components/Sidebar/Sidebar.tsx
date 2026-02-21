@@ -9,18 +9,10 @@ import {
   FiTag,
   FiStar,
   FiArchive,
-  FiSettings,
-  FiHelpCircle,
-  FiLogOut,
-  FiMoon,
-  FiSun,
   FiX,
-  FiUsers,
-  FiBarChart2,
   FiBell,
   FiGrid
 } from 'react-icons/fi'
-import { useTheme } from '../../context/ThemeContext'
 import styles from './Sidebar.module.css'
 
 interface SidebarProps {
@@ -29,8 +21,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
-  const { user, profile, signOutUser } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { user, profile } = useAuth()
   const { currentView, setView } = useView()
   const [isMobile, setIsMobile] = useState(false)
 
@@ -61,12 +52,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { id: 'labels', label: 'Labels', icon: FiTag },
     { id: 'starred', label: 'Starred', icon: FiStar },
     { id: 'archive', label: 'Archive', icon: FiArchive },
-  ]
-
-  // Team & Reports items
-  const teamItems: { id: ViewType; label: string; icon: typeof FiColumns }[] = [
-    { id: 'team', label: 'Team', icon: FiUsers },
-    { id: 'reports', label: 'Reports', icon: FiBarChart2 },
     { id: 'notifications', label: 'Notifications', icon: FiBell },
   ]
 
@@ -135,55 +120,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               </button>
             ))}
           </div>
-
-          <div className={styles.menuSection}>
-            <div className={styles.menuTitle}>TEAM & REPORTS</div>
-            {teamItems.map((item) => (
-              <button
-                key={item.id}
-                className={`${styles.menuItem} ${currentView === item.id ? styles.menuItemActive : ''}`}
-                onClick={() => handleMenuClick(item.id)}
-              >
-                <item.icon className={styles.menuIcon} />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.menuSection}>
-            <div className={styles.menuTitle}>PREFERENCES</div>
-
-            {/* Theme Toggle */}
-            <button className={styles.menuItem} onClick={toggleTheme}>
-              {theme === 'dark' ? <FiSun className={styles.menuIcon} /> : <FiMoon className={styles.menuIcon} />}
-              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-            </button>
-
-            <button
-              className={`${styles.menuItem} ${currentView === 'settings' ? styles.menuItemActive : ''}`}
-              onClick={() => handleMenuClick('settings')}
-            >
-              <FiSettings className={styles.menuIcon} />
-              <span>Settings</span>
-            </button>
-
-            <button
-              className={`${styles.menuItem} ${currentView === 'help' ? styles.menuItemActive : ''}`}
-              onClick={() => handleMenuClick('help')}
-            >
-              <FiHelpCircle className={styles.menuIcon} />
-              <span>Help</span>
-            </button>
-          </div>
         </nav>
-
-        {/* Logout */}
-        <div className={styles.sidebarFooter}>
-          <button className={styles.logoutBtn} onClick={signOutUser}>
-            <FiLogOut />
-            <span>Sign Out</span>
-          </button>
-        </div>
       </aside>
     </>
   )
