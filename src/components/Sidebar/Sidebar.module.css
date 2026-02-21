@@ -47,6 +47,7 @@
   align-items: center;
   justify-content: space-between;
   height: 52px;
+  gap: var(--spacing-sm);
 }
 
 /* Workspace Selector */
@@ -58,8 +59,7 @@
 .workspaceBtn {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  width: 100%;
+  gap: var(--spacing-xs);
   padding: 6px 8px;
   background: transparent;
   border: none;
@@ -73,8 +73,8 @@
 }
 
 .workspaceIcon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   display: flex;
@@ -82,16 +82,8 @@
   justify-content: center;
   color: white;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.875rem;
   flex-shrink: 0;
-}
-
-.workspaceInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  flex: 1;
-  min-width: 0;
 }
 
 .workspaceName {
@@ -103,14 +95,9 @@
   text-overflow: ellipsis;
 }
 
-.workspacePlan {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
 .chevron {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: var(--text-muted);
   transition: transform 0.2s;
   flex-shrink: 0;
@@ -124,35 +111,13 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  right: 0;
+  min-width: 160px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   z-index: 100;
   overflow: hidden;
-}
-
-.workspaceDropdownHeader {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.userEmail {
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.workspaceDropdownDivider {
-  height: 1px;
-  background: var(--border-color);
-  margin: 4px 0;
 }
 
 .workspaceDropdownItem {
@@ -179,6 +144,47 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+
+/* User Profile */
+.userProfile {
+  flex-shrink: 0;
+}
+
+.userBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.userBtn:hover {
+  background: var(--bg-tertiary);
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .userInfo {
