@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { FiUser, FiSettings, FiLogOut } from 'react-icons/fi'
+import { FiUser, FiSettings, FiLogOut, FiPlus, FiBriefcase } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useView } from '../../context/ViewContext'
 import styles from './Header.module.css'
@@ -44,6 +44,17 @@ export default function UserMenu() {
           <div className={styles.userDropdownHeader}>
             <span className={styles.userDropdownName}>{displayName}</span>
             <span className={styles.userDropdownEmail}>{user?.email}</span>
+          </div>
+          <div className={styles.userDropdownDivider} />
+          <div className={styles.userDropdownSection}>
+            <span className={styles.userDropdownSectionTitle}>WORKSPACE</span>
+            <button className={styles.userDropdownItem}>
+              <FiBriefcase /> Kanban Ale Ale
+              <span className={styles.workspaceBadge}>Active</span>
+            </button>
+            <button className={styles.userDropdownItem}>
+              <FiPlus /> Add Workspace
+            </button>
           </div>
           <div className={styles.userDropdownDivider} />
           <button
