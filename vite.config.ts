@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/kanban/',
+  base: '/kanban.github.io/',
   build: {
     outDir: 'dist',
     emptyDirBeforeWrite: true
