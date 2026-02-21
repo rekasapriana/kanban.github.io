@@ -112,7 +112,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             </div>
             <div className={styles.userDetails}>
               <span className={styles.userName}>{displayName}</span>
-              <span className={styles.userEmail}>{user?.email}</span>
             </div>
           </button>
           {isMobile && (
