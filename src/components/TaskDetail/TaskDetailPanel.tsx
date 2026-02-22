@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag, FiPaperclip, FiDownload, FiFile, FiAtSign, FiCornerDownLeft, FiCopy, FiStar, FiAward, FiSmile, FiEye, FiEyeOff, FiUpload, FiActivity, FiList } from 'react-icons/fi'
+import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag, FiPaperclip, FiDownload, FiFile, FiAtSign, FiCornerDownLeft, FiCopy, FiStar, FiAward, FiSmile, FiEye, FiEyeOff, FiUpload, FiActivity, FiList, FiBell, FiClock } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
 import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, getTaskAttachments, deleteTaskAttachment, updateSubtask, getProfile, createNotification, getTeamMembers, toggleTaskWatcher, isTaskWatched, updateTask } from '../../lib/api'
 import { supabase } from '../../lib/supabase'
+import { getReminderOptions, requestNotificationPermission, areNotificationsEnabled, scheduleReminder, calculateReminderTime, formatReminderOffset, cancelReminder, ReminderOffset } from '../../utils/reminderUtils'
 import type { TaskComment, Profile, TaskAttachment, TeamMember, CustomField } from '../../types/database'
 import TimeTracker from './TimeTracker'
 import TaskDependencies from './TaskDependencies'
@@ -44,6 +45,7 @@ export default function TaskDetailPanel() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState<string | null>(null) // commentId
   const [isWatching, setIsWatching] = useState(false)
+  const [reminder, setReminder] = useState<ReminderOffset | ''>('')
   const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -66,6 +68,27 @@ export default function TaskDetailPanel() {
     }
     checkWatchingStatus()
   }, [task?.id, user?.id])
+
+  // Load reminder from task
+  useEffect(() => {
+    if (task?.reminder_at) {
+      // Calculate which offset matches the reminder_at
+      const reminderTime = new Date(task.reminder_at)
+      const dueTime = new Date(task.due_date || '')
+      const diffMs = dueTime.getTime() - reminderTime.getTime()
+      const diffMins = Math.round(diffMs / (1000 * 60))
+
+      if (diffMins <= 15) setReminder('15min')
+      else if (diffMins <= 30) setReminder('30min')
+      else if (diffMins <= 60) setReminder('1hour')
+      else if (diffMins <= 120) setReminder('2hours')
+      else if (diffMins <= 1440) setReminder('1day')
+      else if (diffMins <= 2880) setReminder('2days')
+      else setReminder('1week')
+    } else {
+      setReminder('')
+    }
+  }, [task?.reminder_at])
 
   // Load custom fields and values
   useEffect(() => {
@@ -1103,6 +1126,54 @@ export default function TaskDetailPanel() {
               </div>
             )}
           </div>
+
+          {/* Reminder */}
+          {task.due_date && (
+            <div className={styles.reminderSection}>
+              <div className={styles.reminderHeader}>
+                <FiBell />
+                <span>Reminder</span>
+              </div>
+              <select
+                value={reminder}
+                onChange={async (e) => {
+                  const newReminder = e.target.value as ReminderOffset | ''
+                  setReminder(newReminder)
+
+                  if (newReminder && !areNotificationsEnabled()) {
+                    const granted = await requestNotificationPermission()
+                    if (!granted) {
+                      showToast('Please enable browser notifications', 'error')
+                      return
+                    }
+                  }
+
+                  if (newReminder && task.due_date) {
+                    const reminderTime = calculateReminderTime(task.due_date, newReminder)
+                    await updateTask(task.id, { reminder_at: reminderTime.toISOString() })
+                    scheduleReminder(task.id, task.title, reminderTime)
+                    showToast(`Reminder set for ${formatReminderOffset(newReminder)}`, 'success')
+                  } else {
+                    await updateTask(task.id, { reminder_at: null })
+                    cancelReminder(task.id)
+                    showToast('Reminder removed', 'info')
+                  }
+                }}
+                className={styles.reminderSelect}
+              >
+                <option value="">No reminder</option>
+                {getReminderOptions().map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {reminder && (
+                <div className={styles.reminderInfo}>
+                  <FiClock />
+                  <span>You'll be notified {formatReminderOffset(reminder)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Description */}
           {task.description && (

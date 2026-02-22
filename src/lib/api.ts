@@ -2063,6 +2063,9 @@ export const removeTaskWatcher = async (taskId: string, userId: string) => {
   return { error }
 }
 
+// Alias for removeTaskWatcher
+export const unwatchTask = removeTaskWatcher
+
 export const isTaskWatched = async (taskId: string, userId: string) => {
   const { data, error } = await supabase
     .from('task_watchers')

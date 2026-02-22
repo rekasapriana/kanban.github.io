@@ -18,7 +18,8 @@ import {
   FiFileText,
   FiActivity,
   FiBarChart2,
-  FiZap
+  FiZap,
+  FiEye
 } from 'react-icons/fi'
 import styles from './Sidebar.module.css'
 
@@ -60,6 +61,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { id: 'templates', label: 'Templates', icon: FiFileText },
     { id: 'activity', label: 'Activity', icon: FiActivity },
     { id: 'starred', label: 'Starred', icon: FiStar },
+    { id: 'watching', label: 'Watching', icon: FiEye },
     { id: 'archive', label: 'Archive', icon: FiArchive },
     { id: 'notifications', label: 'Notifications', icon: FiBell },
   ]

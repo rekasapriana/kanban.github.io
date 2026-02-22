@@ -22,6 +22,7 @@ type ViewType =
   | 'activity'
   | 'automation'
   | 'custom-fields'
+  | 'watching'
 
 interface ViewContextType {
   currentView: ViewType

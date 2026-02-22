@@ -32,7 +32,8 @@ import {
   WorkloadView,
   TimelineView,
   TemplatesView,
-  ActivityView
+  ActivityView,
+  WatchingView
 } from './components/Views'
 import AutomationView from './components/Board/AutomationView'
 import CustomFieldsView from './components/Board/CustomFieldsView'
@@ -84,6 +85,7 @@ function MainContent() {
       case 'activity': return <ActivityView key="activity" />
       case 'automation': return <AutomationView key="automation" />
       case 'custom-fields': return <CustomFieldsView key="custom-fields" />
+      case 'watching': return <WatchingView key="watching" />
       default: return <Board key="board-default" />
     }
   }, [currentView])
