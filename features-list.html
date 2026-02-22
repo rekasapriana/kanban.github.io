@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Pro - Daftar Fitur</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      padding: 40px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #6366f1;
+      border-bottom: 3px solid #6366f1;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+    h2 {
+      color: #1f2937;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      padding: 10px 15px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border-radius: 8px;
+      font-size: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    th {
+      background: #f3f4f6;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    tr:hover { background: #f9fafb; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #10b981;
+      color: white;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .new { background: #f59e0b; }
+    .total {
+      background: #6366f1;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      margin-top: 30px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+    }
+    @media print {
+      body { padding: 20px; }
+      h2 { page-break-after: avoid; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Kanban Pro - Daftar Lengkap Fitur</h1>
+
+<h2>Autentikasi & User</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Login Email</td><td>Login dengan email dan password</td></tr>
+  <tr><td>Login Google</td><td>OAuth login dengan akun Google</td></tr>
+  <tr><td>Register</td><td>Registrasi akun baru</td></tr>
+  <tr><td>Logout</td><td>Keluar dari akun</td></tr>
+  <tr><td>Profile</td><td>Edit nama dan avatar</td></tr>
+  <tr><td>User Settings</td><td>Pengaturan notifikasi, compact mode, dll</td></tr>
+</table>
+
+<h2>Views / Tampilan</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Dashboard</td><td>Ringkasan statistik tugas, aktivitas terbaru</td></tr>
+  <tr><td>Kanban Board</td><td>Tampilan papan dengan kolom drag & drop</td></tr>
+  <tr><td>My Tasks</td><td>Daftar tugas yang ditugaskan ke user</td></tr>
+  <tr><td>Calendar</td><td>Kalender dengan tugas berdasarkan tanggal jatuh tempo</td></tr>
+  <tr><td>Projects</td><td>Kelola proyek dengan jumlah tugas per proyek</td></tr>
+  <tr><td>Labels</td><td>Kelola label dengan warna</td></tr>
+  <tr><td>Starred</td><td>Tugas yang ditandai bintang/favorit</td></tr>
+  <tr><td>Archive</td><td>Tugas yang diarsip</td></tr>
+  <tr><td>Team</td><td>Kelola anggota tim</td></tr>
+  <tr><td>Reports</td><td>Laporan dan statistik</td></tr>
+  <tr><td>Notifications</td><td>Pusat notifikasi</td></tr>
+  <tr><td>Settings</td><td>Pengaturan aplikasi</td></tr>
+  <tr><td>Help</td><td>Bantuan dan shortcut</td></tr>
+  <tr><td>Gantt Chart [BARU]</td><td>Timeline horizontal tugas</td></tr>
+  <tr><td>Timeline [BARU]</td><td>Timeline vertikel berdasarkan tanggal</td></tr>
+  <tr><td>Workload [BARU]</td><td>Distribusi beban kerja per anggota</td></tr>
+</table>
+
+<h2>Task Management</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Buat Tugas</td><td>Form untuk tugas baru</td></tr>
+  <tr><td>Edit Tugas</td><td>Ubah detail tugas</td></tr>
+  <tr><td>Hapus Tugas</td><td>Hapus tugas dengan konfirmasi</td></tr>
+  <tr><td>Arsip Tugas</td><td>Pindahkan ke arsip</td></tr>
+  <tr><td>Pulihkan Tugas</td><td>Kembalikan dari arsip</td></tr>
+  <tr><td>Drag & Drop</td><td>Geser tugas antar kolom</td></tr>
+  <tr><td>Priority</td><td>Low, Medium, High dengan warna</td></tr>
+  <tr><td>Due Date</td><td>Tanggal jatuh tempo</td></tr>
+  <tr><td>Description</td><td>Deskripsi detail tugas</td></tr>
+  <tr><td>Tags</td><td>Tag bebas untuk kategorisasi</td></tr>
+  <tr><td>Labels</td><td>Label dengan warna</td></tr>
+  <tr><td>Subtasks</td><td>Checklist sub-tugas</td></tr>
+  <tr><td>Assignees</td><td>Penugasan ke multiple user</td></tr>
+  <tr><td>Project</td><td>Kaitkan dengan proyek</td></tr>
+</table>
+
+<h2>Time Tracking [BARU]</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Start Timer</td><td>Mulai hitung waktu</td></tr>
+  <tr><td>Stop Timer</td><td>Hentikan dan simpan</td></tr>
+  <tr><td>Manual Entry</td><td>Input waktu manual</td></tr>
+  <tr><td>Time Log</td><td>Riwayat waktu per tugas</td></tr>
+  <tr><td>Total Time</td><td>Total waktu yang dicatat</td></tr>
+  <tr><td>Delete Entry</td><td>Hapus catatan waktu</td></tr>
+</table>
+
+<h2>Dependencies [BARU]</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Add Dependency</td><td>Tambah tugas yang harus selesai dulu</td></tr>
+  <tr><td>Remove Dependency</td><td>Hapus ketergantungan</td></tr>
+  <tr><td>View Blocking</td><td>Lihat tugas yang diblokir</td></tr>
+  <tr><td>View Blocked By</td><td>Lihat tugas yang menunggu</td></tr>
+  <tr><td>Circular Check</td><td>Validasi tidak boleh circular</td></tr>
+  <tr><td>Status Indicator</td><td>Tanda selesai/belum dependency</td></tr>
+</table>
+
+<h2>Recurring Tasks [BARU]</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Daily</td><td>Berulang setiap hari</td></tr>
+  <tr><td>Weekly</td><td>Berulang setiap minggu</td></tr>
+  <tr><td>Monthly</td><td>Berulang setiap bulan</td></tr>
+  <tr><td>Yearly</td><td>Berulang setiap tahun</td></tr>
+  <tr><td>Interval</td><td>Setiap X hari/minggu/bulan</td></tr>
+  <tr><td>Days Selection</td><td>Pilih hari tertentu (untuk weekly)</td></tr>
+  <tr><td>Day of Month</td><td>Pilih tanggal (untuk monthly)</td></tr>
+  <tr><td>End Date</td><td>Tanggal berakhir pengulangan</td></tr>
+  <tr><td>Active Toggle</td><td>Aktif/nonaktif tanpa hapus</td></tr>
+</table>
+
+<h2>Templates [BARU]</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Create Template</td><td>Buat template dari tugas</td></tr>
+  <tr><td>Template Name</td><td>Nama template</td></tr>
+  <tr><td>Template Description</td><td>Deskripsi template</td></tr>
+  <tr><td>Title Template</td><td>Judul default</td></tr>
+  <tr><td>Description Template</td><td>Deskripsi default</td></tr>
+  <tr><td>Priority Default</td><td>Prioritas default</td></tr>
+  <tr><td>Default Labels</td><td>Label otomatis</td></tr>
+  <tr><td>Default Tags</td><td>Tag otomatis</td></tr>
+  <tr><td>Subtask Templates</td><td>Subtask otomatis</td></tr>
+  <tr><td>Use Template</td><td>Buat tugas dari template</td></tr>
+  <tr><td>Delete Template</td><td>Hapus template</td></tr>
+</table>
+
+<h2>Activity Log [BARU]</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Task Created</td><td>Log saat tugas dibuat</td></tr>
+  <tr><td>Task Updated</td><td>Log saat tugas diubah</td></tr>
+  <tr><td>Task Moved</td><td>Log saat pindah kolom</td></tr>
+  <tr><td>Task Deleted</td><td>Log saat tugas dihapus</td></tr>
+  <tr><td>Task Archived</td><td>Log saat diarsip</td></tr>
+  <tr><td>Task Restored</td><td>Log saat dipulihkan</td></tr>
+  <tr><td>Priority Changed</td><td>Log perubahan prioritas</td></tr>
+  <tr><td>Due Date Changed</td><td>Log perubahan tanggal</td></tr>
+  <tr><td>Filter by Type</td><td>Filter jenis aktivitas</td></tr>
+  <tr><td>Timestamp</td><td>Waktu aktivitas</td></tr>
+  <tr><td>User Info</td><td>Siapa yang melakukan</td></tr>
+</table>
+
+<h2>Filtering & Search</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Search Box</td><td>Cari tugas berdasarkan keyword</td></tr>
+  <tr><td>Advanced Filters [BARU]</td><td>Filter kompleks</td></tr>
+  <tr><td>- By Priority</td><td>Filter berdasarkan prioritas</td></tr>
+  <tr><td>- By Assignee</td><td>Filter berdasarkan penerima</td></tr>
+  <tr><td>- By Due Date</td><td>Filter berdasarkan tanggal</td></tr>
+  <tr><td>- By Label</td><td>Filter berdasarkan label</td></tr>
+  <tr><td>- By Project</td><td>Filter berdasarkan proyek</td></tr>
+  <tr><td>Quick Filters</td><td>Overdue, Today, Unassigned, High Priority</td></tr>
+  <tr><td>Filter Chips</td><td>Tampilan filter aktif</td></tr>
+  <tr><td>Clear All</td><td>Reset semua filter</td></tr>
+</table>
+
+<h2>Board Management</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Default Board</td><td>Papan otomatis untuk user baru</td></tr>
+  <tr><td>Multiple Boards [BARU]</td><td>Dukungan banyak papan</td></tr>
+  <tr><td>Board Switcher [BARU]</td><td>Ganti antar papan</td></tr>
+  <tr><td>Create Board [BARU]</td><td>Buat papan baru</td></tr>
+  <tr><td>Board Members [BARU]</td><td>Undang anggota ke papan</td></tr>
+  <tr><td>Member Roles [BARU]</td><td>Owner, Admin, Member, Viewer</td></tr>
+</table>
+
+<h2>Team</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Add Team Member</td><td>Tambah anggota tim</td></tr>
+  <tr><td>Edit Member</td><td>Ubah detail anggota</td></tr>
+  <tr><td>Delete Member</td><td>Hapus anggota</td></tr>
+  <tr><td>Member Roles</td><td>Admin, Member, Viewer</td></tr>
+  <tr><td>Status</td><td>Online, Offline, Away</td></tr>
+  <tr><td>Team Invitation</td><td>Undang via email</td></tr>
+  <tr><td>Pending Invitations</td><td>Daftar undangan tertunda</td></tr>
+  <tr><td>Accept/Decline</td><td>Terima atau tolak undangan</td></tr>
+</table>
+
+<h2>Comments & Attachments</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Add Comment</td><td>Komentar di tugas</td></tr>
+  <tr><td>Edit Comment</td><td>Ubah komentar</td></tr>
+  <tr><td>Delete Comment</td><td>Hapus komentar</td></tr>
+  <tr><td>Image in Comment</td><td>Lampirkan gambar</td></tr>
+  <tr><td>Upload Attachment</td><td>Upload file ke tugas</td></tr>
+  <tr><td>View Attachments</td><td>Lihat daftar file</td></tr>
+  <tr><td>Delete Attachment</td><td>Hapus file</td></tr>
+</table>
+
+<h2>Notifications</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Task Assignment</td><td>Notif saat ditugaskan</td></tr>
+  <tr><td>System Notifications</td><td>Notif sistem</td></tr>
+  <tr><td>Mark as Read</td><td>Tandai sudah dibaca</td></tr>
+  <tr><td>Mark All Read</td><td>Tandai semua dibaca</td></tr>
+  <tr><td>Delete Notification</td><td>Hapus notifikasi</td></tr>
+</table>
+
+<h2>Theme & UI</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Dark Mode</td><td>Tema gelap</td></tr>
+  <tr><td>Light Mode</td><td>Tema terang</td></tr>
+  <tr><td>Toggle Theme</td><td>Tombol ganti tema</td></tr>
+  <tr><td>Responsive</td><td>Tampilan mobile-friendly</td></tr>
+  <tr><td>Collapsible Sidebar</td><td>Sidebar bisa disembunyikan</td></tr>
+  <tr><td>Compact Mode</td><td>Mode tampilan ringkas</td></tr>
+</table>
+
+<h2>Shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Aksi</th></tr>
+  <tr><td>N</td><td>Buat tugas baru</td></tr>
+  <tr><td>/</td><td>Fokus ke search</td></tr>
+  <tr><td>?</td><td>Buka shortcut help</td></tr>
+  <tr><td>Esc</td><td>Tutup modal/panel</td></tr>
+  <tr><td>T</td><td>Toggle tema</td></tr>
+</table>
+
+<h2>Data Management</h2>
+<table>
+  <tr><th>Fitur</th><th>Deskripsi</th></tr>
+  <tr><td>Export Data</td><td>Export ke JSON</td></tr>
+  <tr><td>Auto Save</td><td>Simpan otomatis</td></tr>
+  <tr><td>Real-time Sync</td><td>Sinkronisasi real-time via Supabase</td></tr>
+</table>
+
+<h2>Database Tables (23 Tabel)</h2>
+<table>
+  <tr><th>Tabel</th><th>Deskripsi</th></tr>
+  <tr><td>profiles</td><td>Data profil user</td></tr>
+  <tr><td>boards</td><td>Papan kanban</td></tr>
+  <tr><td>columns</td><td>Kolom di papan</td></tr>
+  <tr><td>tasks</td><td>Tugas</td></tr>
+  <tr><td>tags</td><td>Tag tugas</td></tr>
+  <tr><td>subtasks</td><td>Sub-tugas</td></tr>
+  <tr><td>projects</td><td>Proyek</td></tr>
+  <tr><td>labels</td><td>Label dengan warna</td></tr>
+  <tr><td>task_labels</td><td>Relasi tugas-label</td></tr>
+  <tr><td>task_assignees</td><td>Relasi tugas-user</td></tr>
+  <tr><td>starred_tasks</td><td>Tugas favorit</td></tr>
+  <tr><td>team_members</td><td>Anggota tim</td></tr>
+  <tr><td>team_invitations</td><td>Undangan tim</td></tr>
+  <tr><td>notifications</td><td>Notifikasi</td></tr>
+  <tr><td>user_settings</td><td>Pengaturan user</td></tr>
+  <tr><td>task_comments</td><td>Komentar tugas</td></tr>
+  <tr><td>task_attachments</td><td>Lampiran tugas</td></tr>
+  <tr><td>task_time_entries [BARU]</td><td>Catatan waktu</td></tr>
+  <tr><td>task_dependencies [BARU]</td><td>Ketergantungan tugas</td></tr>
+  <tr><td>recurring_patterns [BARU]</td><td>Pola pengulangan</td></tr>
+  <tr><td>task_templates [BARU]</td><td>Template tugas</td></tr>
+  <tr><td>activity_logs [BARU]</td><td>Log aktivitas</td></tr>
+  <tr><td>board_members [BARU]</td><td>Anggota papan</td></tr>
+</table>
+
+<div class="total">
+  Total: 100+ Fitur
+</div>
+
+<div class="footer">
+  <p>Kanban Pro - Aplikasi Manajemen Tugas</p>
+  <p>Dibuat dengan React + TypeScript + Supabase</p>
+  <p>Tanggal: Februari 2025</p>
+</div>
+
+</body>
+</html>

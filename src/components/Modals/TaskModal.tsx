@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, FormEvent, KeyboardEvent } from 'react'
-import { FiPlus, FiEdit2, FiType, FiFlag, FiCalendar, FiTag, FiAlignLeft, FiCheckSquare, FiX, FiFolder, FiBookmark, FiUser } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiType, FiFlag, FiCalendar, FiTag, FiAlignLeft, FiCheckSquare, FiX, FiFolder, FiBookmark, FiUser, FiFileText, FiChevronDown, FiPaperclip } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
-import { getProjects, getLabels, getTeamMembers, getProfileByEmail, updateTeamMember } from '../../lib/api'
-import type { Project, Label, TeamMember } from '../../types/database'
+import { getProjects, getLabels, getTeamMembers, getProfileByEmail, updateTeamMember, getTaskTemplates, uploadTaskAttachment } from '../../lib/api'
+import type { Project, Label, TeamMember, TaskTemplate } from '../../types/database'
 import Button from '../UI/Button'
 import styles from './TaskModal.module.css'
 
@@ -11,6 +11,11 @@ interface SubtaskForm {
   id?: string
   title: string
   is_completed: boolean
+}
+
+interface PendingAttachment {
+  file: File
+  preview?: string
 }
 
 export default function TaskModal() {
@@ -30,6 +35,10 @@ export default function TaskModal() {
   const [projects, setProjects] = useState<Project[]>([])
   const [labels, setLabels] = useState<Label[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!state.editingTask
@@ -41,10 +50,11 @@ export default function TaskModal() {
 
       console.log('[TaskModal] Loading data for user:', user.id)
 
-      const [projectsRes, labelsRes, membersRes] = await Promise.all([
+      const [projectsRes, labelsRes, membersRes, templatesRes] = await Promise.all([
         getProjects(user.id),
         getLabels(user.id),
-        getTeamMembers(user.id)
+        getTeamMembers(user.id),
+        getTaskTemplates(user.id)
       ])
 
       console.log('[TaskModal] Projects:', projectsRes.data?.length || 0)
@@ -54,6 +64,7 @@ export default function TaskModal() {
 
       if (projectsRes.data) setProjects(projectsRes.data)
       if (labelsRes.data) setLabels(labelsRes.data)
+      if (templatesRes.data) setTemplates(templatesRes.data)
 
       // Process team members
       if (membersRes.data && membersRes.data.length > 0) {
@@ -144,6 +155,49 @@ export default function TaskModal() {
     setProjectId(null)
     setSelectedAssignees([])
     setSelectedLabels([])
+    setPendingAttachments([])
+    setShowTemplateDropdown(false)
+  }
+
+  // Attachment handlers
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newAttachments: PendingAttachment[] = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      // Max 10MB per file
+      if (file.size > 10 * 1024 * 1024) continue
+
+      const attachment: PendingAttachment = { file }
+      // Create preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          attachment.preview = reader.result as string
+        }
+        reader.readAsDataURL(file)
+      }
+      newAttachments.push(attachment)
+    }
+
+    setPendingAttachments([...pendingAttachments, ...newAttachments])
+
+    // Reset input
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = ''
+    }
+  }
+
+  const removePendingAttachment = (index: number) => {
+    setPendingAttachments(pendingAttachments.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -153,7 +207,7 @@ export default function TaskModal() {
       return
     }
 
-    await saveTask(
+    const taskId = await saveTask(
       {
         title: title.trim(),
         description: description.trim() || null,
@@ -170,6 +224,13 @@ export default function TaskModal() {
       projectId,
       selectedAssignees
     )
+
+    // Upload attachments if task was created successfully
+    if (taskId && pendingAttachments.length > 0 && user) {
+      for (const attachment of pendingAttachments) {
+        await uploadTaskAttachment(taskId, user.id, attachment.file)
+      }
+    }
 
     resetForm()
   }
@@ -227,6 +288,54 @@ export default function TaskModal() {
     setSubtasks(subtasks.filter((_, i) => i !== index))
   }
 
+  // Apply template to form
+  const applyTemplate = (template: TaskTemplate) => {
+    if (template.title_template) {
+      setTitle(template.title_template)
+    }
+    if (template.description_template) {
+      setDescription(template.description_template)
+    }
+    setPriority(template.priority)
+    if (template.default_tags && template.default_tags.length > 0) {
+      setTags(template.default_tags)
+    }
+    if (template.subtask_templates && Array.isArray(template.subtask_templates)) {
+      setSubtasks(template.subtask_templates.map((s: any, index: number) => ({
+        title: s.title,
+        is_completed: false
+      })))
+    }
+    setShowTemplateDropdown(false)
+  }
+
+  // Create template from current form
+  const saveAsTemplate = async () => {
+    const name = prompt('Nama template:')
+    if (!name || !user) return
+
+    const { createTaskTemplate } = await import('../../lib/api')
+    const { error } = await createTaskTemplate({
+      user_id: user.id,
+      name,
+      description: `Template created from task: ${title}`,
+      title_template: title,
+      description_template: description,
+      priority,
+      default_tags: tags,
+      subtask_templates: subtasks.map((s, i) => ({ title: s.title, position: i }))
+    })
+
+    if (error) {
+      alert('Gagal menyimpan template')
+    } else {
+      alert('Template disimpan!')
+      // Reload templates
+      const { data } = await getTaskTemplates(user.id)
+      if (data) setTemplates(data)
+    }
+  }
+
   // Label toggle
   const toggleLabel = (labelId: string) => {
     if (selectedLabels.includes(labelId)) {
@@ -252,6 +361,43 @@ export default function TaskModal() {
             <FiX />
           </button>
         </div>
+
+        {/* Template Selector - Only show when creating new task */}
+        {!isEditing && templates.length > 0 && (
+          <div className={styles.templateSection}>
+            <div className={styles.templateDropdown}>
+              <button
+                type="button"
+                className={styles.templateBtn}
+                onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+              >
+                <FiFileText />
+                <span>Use Template</span>
+                <FiChevronDown className={showTemplateDropdown ? styles.rotated : ''} />
+              </button>
+              {showTemplateDropdown && (
+                <div className={styles.templateList}>
+                  {templates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      className={styles.templateItem}
+                      onClick={() => applyTemplate(template)}
+                    >
+                      <FiFileText />
+                      <div className={styles.templateInfo}>
+                        <span className={styles.templateName}>{template.name}</span>
+                        {template.description && (
+                          <span className={styles.templateDesc}>{template.description}</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className={styles.modalBody}>
@@ -470,6 +616,57 @@ export default function TaskModal() {
                     <FiPlus />
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Attachments */}
+            <div className={styles.formGroup}>
+              <label>
+                <FiPaperclip />
+                Attachments
+              </label>
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                multiple
+                onChange={handleAttachmentSelect}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z,.txt,.jpg,.jpeg,.png,.gif,.svg"
+              />
+              <div className={styles.attachmentsContainer}>
+                {pendingAttachments.length > 0 && (
+                  <div className={styles.pendingAttachments}>
+                    {pendingAttachments.map((att, i) => (
+                      <div key={i} className={styles.pendingAttachment}>
+                        {att.preview ? (
+                          <img src={att.preview} alt={att.file.name} />
+                        ) : (
+                          <div className={styles.fileIcon}>
+                            <FiPaperclip />
+                          </div>
+                        )}
+                        <div className={styles.fileInfo}>
+                          <span className={styles.fileName}>{att.file.name}</span>
+                          <span className={styles.fileSize}>{formatFileSize(att.file.size)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.removeFile}
+                          onClick={() => removePendingAttachment(i)}
+                        >
+                          <FiX />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={styles.uploadBtn}
+                  onClick={() => attachmentInputRef.current?.click()}
+                >
+                  <FiPlus /> Add Files
+                </button>
               </div>
             </div>
           </div>

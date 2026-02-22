@@ -11,7 +11,12 @@ import {
   FiArchive,
   FiX,
   FiBell,
-  FiGrid
+  FiGrid,
+  FiLayers,
+  FiUsers,
+  FiClock,
+  FiFileText,
+  FiActivity
 } from 'react-icons/fi'
 import styles from './Sidebar.module.css'
 
@@ -50,9 +55,18 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const organizeItems: { id: ViewType; label: string; icon: typeof FiColumns }[] = [
     { id: 'projects', label: 'Projects', icon: FiFolder },
     { id: 'labels', label: 'Labels', icon: FiTag },
+    { id: 'templates', label: 'Templates', icon: FiFileText },
+    { id: 'activity', label: 'Activity', icon: FiActivity },
     { id: 'starred', label: 'Starred', icon: FiStar },
     { id: 'archive', label: 'Archive', icon: FiArchive },
     { id: 'notifications', label: 'Notifications', icon: FiBell },
+  ]
+
+  // Views menu items
+  const viewItems: { id: ViewType; label: string; icon: typeof FiColumns }[] = [
+    { id: 'gantt', label: 'Gantt Chart', icon: FiLayers },
+    { id: 'timeline', label: 'Timeline', icon: FiClock },
+    { id: 'workload', label: 'Workload', icon: FiUsers },
   ]
 
   const handleMenuClick = (id: ViewType) => {
@@ -110,6 +124,20 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className={styles.menuSection}>
             <div className={styles.menuTitle}>ORGANIZE</div>
             {organizeItems.map((item) => (
+              <button
+                key={item.id}
+                className={`${styles.menuItem} ${currentView === item.id ? styles.menuItemActive : ''}`}
+                onClick={() => handleMenuClick(item.id)}
+              >
+                <item.icon className={styles.menuIcon} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.menuSection}>
+            <div className={styles.menuTitle}>VIEWS</div>
+            {viewItems.map((item) => (
               <button
                 key={item.id}
                 className={`${styles.menuItem} ${currentView === item.id ? styles.menuItemActive : ''}`}

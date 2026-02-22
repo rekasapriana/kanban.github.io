@@ -55,6 +55,8 @@ export interface Task {
   is_archived: boolean
   project_id: string | null
   assignee_id?: string | null
+  timer_started_at?: string | null
+  timer_user_id?: string | null
   created_at: string
   updated_at: string
   tags: Tag[]
@@ -63,6 +65,9 @@ export interface Task {
   projects?: Project
   assignee?: Profile | null
   task_assignees?: TaskAssigneeWithProfile[]
+  time_entries?: TimeEntry[]
+  dependencies?: TaskDependency[]
+  recurring_pattern?: RecurringPattern | null
 }
 
 // ==================== TASK ASSIGNEES ====================
@@ -79,8 +84,8 @@ export interface TaskAssigneeWithProfile extends TaskAssignee {
   profiles: Profile
 }
 
-export type TaskInsert = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'tags' | 'subtasks' | 'task_labels' | 'projects' | 'assignee'>
-export type TaskUpdate = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'column_id' | 'position' | 'is_archived' | 'project_id' | 'assignee_id'>>
+export type TaskInsert = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'tags' | 'subtasks' | 'task_labels' | 'projects' | 'assignee' | 'time_entries' | 'dependencies' | 'recurring_pattern'>
+export type TaskUpdate = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'column_id' | 'position' | 'is_archived' | 'project_id' | 'assignee_id' | 'timer_started_at' | 'timer_user_id'>>
 export type TagInsert = Omit<Tag, 'id' | 'created_at'>
 export type SubtaskInsert = Pick<Subtask, 'task_id' | 'title' | 'position'> & { is_completed?: boolean }
 export type SubtaskUpdate = Partial<Pick<Subtask, 'title' | 'is_completed' | 'position'>>
@@ -200,6 +205,8 @@ export interface TaskComment {
   user_id: string
   content: string
   image_url?: string | null
+  parent_id?: string | null
+  is_pinned?: boolean
   created_at: string
   updated_at: string
 }
@@ -236,3 +243,113 @@ export interface TeamInvitation {
 
 export type TeamInvitationInsert = Omit<TeamInvitation, 'id' | 'invited_at' | 'responded_at' | 'created_at'>
 export type TeamInvitationUpdate = Partial<Pick<TeamInvitation, 'status' | 'responded_at'>>
+
+// ==================== TIME TRACKING ====================
+export interface TimeEntry {
+  id: string
+  task_id: string
+  user_id: string
+  duration_seconds: number
+  description: string | null
+  started_at: string | null
+  stopped_at: string | null
+  created_at: string
+}
+
+export type TimeEntryInsert = Omit<TimeEntry, 'id' | 'created_at'>
+
+// ==================== TASK DEPENDENCIES ====================
+export interface TaskDependency {
+  id: string
+  task_id: string
+  depends_on_task_id: string
+  dependency_type: 'blocks' | 'blocked_by'
+  created_at: string
+}
+
+export type TaskDependencyInsert = Omit<TaskDependency, 'id' | 'created_at'>
+
+// ==================== RECURRING PATTERNS ====================
+export interface RecurringPattern {
+  id: string
+  task_id: string
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  interval_value: number
+  days_of_week: number[] | null
+  day_of_month: number | null
+  end_date: string | null
+  next_occurrence: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type RecurringPatternInsert = Omit<RecurringPattern, 'id' | 'created_at'>
+export type RecurringPatternUpdate = Partial<Omit<RecurringPattern, 'id' | 'task_id' | 'created_at'>>
+
+// ==================== TASK TEMPLATES ====================
+export interface TaskTemplate {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  title_template: string | null
+  description_template: string | null
+  priority: 'low' | 'medium' | 'high'
+  default_labels: string[] | null
+  default_tags: string[] | null
+  subtask_templates: SubtaskTemplate[] | null
+  created_at: string
+}
+
+export interface SubtaskTemplate {
+  title: string
+  position: number
+}
+
+export type TaskTemplateInsert = Omit<TaskTemplate, 'id' | 'created_at'>
+export type TaskTemplateUpdate = Partial<Omit<TaskTemplate, 'id' | 'user_id' | 'created_at'>>
+
+// ==================== ACTIVITY LOG ====================
+export interface ActivityLog {
+  id: string
+  board_id: string | null
+  task_id: string | null
+  user_id: string | null
+  action_type: ActivityActionType
+  action_details: Record<string, unknown> | null
+  created_at: string
+}
+
+export type ActivityActionType =
+  | 'task_created'
+  | 'task_updated'
+  | 'task_deleted'
+  | 'task_moved'
+  | 'task_completed'
+  | 'task_archived'
+  | 'task_restored'
+  | 'comment_added'
+  | 'attachment_added'
+  | 'assignee_added'
+  | 'assignee_removed'
+  | 'label_added'
+  | 'label_removed'
+  | 'due_date_changed'
+  | 'priority_changed'
+  | 'time_logged'
+  | 'board_created'
+  | 'board_updated'
+
+export type ActivityLogInsert = Omit<ActivityLog, 'id' | 'created_at'>
+
+// ==================== BOARD MEMBERS ====================
+export interface BoardMember {
+  id: string
+  board_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member' | 'viewer'
+  created_at: string
+}
+
+export type BoardMemberInsert = Omit<BoardMember, 'id' | 'created_at'>
+export type BoardMemberUpdate = Partial<Pick<BoardMember, 'role'>>

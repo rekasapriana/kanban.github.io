@@ -365,7 +365,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     labelIds: string[] = [],
     projectId: string | null = null,
     assigneeIds: string[] = []
-  ) => {
+  ): Promise<string | null> => {
     console.log('[saveTask] Starting...', {
       editingTask: state.editingTask,
       modalColumnId: state.modalColumnId,
@@ -492,17 +492,21 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
         await loadTasks()
         showToast('Task created!', 'success')
+        closeModal()
+        return data.id
       }
 
       closeModal()
+      return state.editingTask?.id || null
     } catch (error: any) {
       console.error('[saveTask] Error:', error)
       console.error('[saveTask] Error message:', error?.message)
       console.error('[saveTask] Error details:', error?.details)
       console.error('[saveTask] Error hint:', error?.hint)
       showToast(`Failed to save task: ${error?.message || 'Unknown error'}`, 'error')
+      return null
     }
-  }, [state.editingTask, state.modalColumnId, state.board, state.tasks, user, loadTasks, closeModal, showToast])
+  }, [state.editingTask, state.modalColumnId, state.board, state.tasks, user, profile, loadTasks, closeModal, showToast])
 
   const deleteTask = useCallback(async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return

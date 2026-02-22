@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext'
 import Column from './Column'
 import TaskCard from './TaskCard'
 import TaskDetailPanel from '../TaskDetail/TaskDetailPanel'
+import AdvancedFilters from './AdvancedFilters'
 import { useTheme } from '../../context/ThemeContext'
 import styles from './Board.module.css'
 
@@ -23,6 +24,7 @@ export default function Board() {
   const { user } = useAuth()
   const { toggleTheme } = useTheme()
   const [activeTask, setActiveTask] = useState<string | null>(null)
+  const [advancedFilters, setAdvancedFilters] = useState<{field: string; operator: string; value: string | string[]}[]>([])
 
   // Debug
   console.log('[Board] Rendering with columns:', state.columns.length, 'tasks:', state.tasks.length, 'loading:', state.loading)
@@ -119,7 +121,8 @@ export default function Board() {
         ? task.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
           (task.description?.toLowerCase().includes(state.searchQuery.toLowerCase()) ?? false)
         : true
-      return matchesColumn && matchesSearch
+      const matchesAdvancedFilters = matchesFilters(task)
+      return matchesColumn && matchesSearch && matchesAdvancedFilters
     })
   }
 
@@ -130,8 +133,89 @@ export default function Board() {
         ? task.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
           (task.description?.toLowerCase().includes(state.searchQuery.toLowerCase()) ?? false)
         : true
-      return matchesSearch && !task.is_archived
+      const matchesAdvancedFilters = matchesFilters(task)
+      return matchesSearch && !task.is_archived && matchesAdvancedFilters
     })
+  }
+
+  // Check if task matches advanced filters
+  const matchesFilters = (task: typeof state.tasks[0]): boolean => {
+    if (advancedFilters.length === 0) return true
+
+    return advancedFilters.every(filter => {
+      switch (filter.field) {
+        case 'priority':
+          if (filter.operator === 'is') return task.priority === filter.value
+          if (filter.operator === 'is_not') return task.priority !== filter.value
+          return true
+        case 'assignee':
+          const assigneeIds = task.task_assignees?.map(a => a.user_id) || []
+          if (filter.operator === 'is') return assigneeIds.includes(filter.value as string)
+          if (filter.operator === 'is_not') return !assigneeIds.includes(filter.value as string)
+          if (filter.operator === 'is_empty') return assigneeIds.length === 0
+          return true
+        case 'due_date':
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const taskDueDate = task.due_date ? new Date(task.due_date) : null
+          if (filter.operator === 'is_empty') return !taskDueDate
+          if (filter.operator === 'is_overdue') return taskDueDate && taskDueDate < today
+          if (filter.operator === 'is_today') {
+            if (!taskDueDate) return false
+            const todayStr = today.toISOString().split('T')[0]
+            const taskDateStr = taskDueDate.toISOString().split('T')[0]
+            return todayStr === taskDateStr
+          }
+          if (filter.operator === 'is_this_week') {
+            if (!taskDueDate) return false
+            const weekEnd = new Date(today)
+            weekEnd.setDate(weekEnd.getDate() + 7)
+            return taskDueDate >= today && taskDueDate <= weekEnd
+          }
+          return true
+        case 'label':
+          const taskTagIds = task.tags?.map(t => t.id) || []
+          if (filter.operator === 'has') return taskTagIds.includes(filter.value as string)
+          if (filter.operator === 'does_not_have') return !taskTagIds.includes(filter.value as string)
+          return true
+        default:
+          return true
+      }
+    })
+  }
+
+  // Get unique assignees from all tasks
+  const getAllAssignees = () => {
+    const assigneeMap = new Map<string, { id: string; name: string; avatar_url: string | null }>()
+    state.tasks.forEach(task => {
+      task.task_assignees?.forEach(a => {
+        if (!assigneeMap.has(a.user_id)) {
+          assigneeMap.set(a.user_id, {
+            id: a.user_id,
+            name: a.profiles?.full_name || a.profiles?.email?.split('@')[0] || 'Unknown',
+            avatar_url: a.profiles?.avatar_url
+          })
+        }
+      })
+    })
+    return Array.from(assigneeMap.values())
+  }
+
+  // Get unique labels from all tasks
+  const getAllLabels = () => {
+    const labelMap = new Map<string, { id: string; name: string; color: string }>()
+    state.tasks.forEach(task => {
+      task.tags?.forEach(tag => {
+        if (!labelMap.has(tag.id)) {
+          labelMap.set(tag.id, {
+            id: tag.id,
+            name: tag.name,
+            color: tag.color || '#6366f1'
+          })
+        }
+      })
+    })
+    return Array.from(labelMap.values())
   }
 
   const activeTaskData = activeTask ? state.tasks.find(t => t.id === activeTask) : null
@@ -190,6 +274,15 @@ export default function Board() {
             </button>
           )}
         </div>
+
+        {/* Advanced Filters */}
+        <AdvancedFilters
+          onFiltersChange={setAdvancedFilters}
+          priorities={['low', 'medium', 'high']}
+          labels={getAllLabels()}
+          projects={[]}
+          assignees={getAllAssignees()}
+        />
 
         <div className={styles.viewToggle}>
           <button

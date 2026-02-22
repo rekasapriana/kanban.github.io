@@ -8,7 +8,13 @@ import type {
   NotificationInsert,
   UserSettingsInsert, UserSettingsUpdate,
   TaskCommentInsert, TaskCommentUpdate,
-  TaskAttachmentInsert
+  TaskAttachmentInsert,
+  TimeEntry, TimeEntryInsert,
+  TaskDependency, TaskDependencyInsert,
+  RecurringPattern, RecurringPatternInsert, RecurringPatternUpdate,
+  TaskTemplate, TaskTemplateInsert, TaskTemplateUpdate,
+  ActivityLog, ActivityLogInsert,
+  BoardMember, BoardMemberInsert, BoardMemberUpdate
 } from '../types/database'
 
 // ==================== AUTH ====================
@@ -1202,5 +1208,584 @@ export const cancelTeamInvitation = async (invitationId: string) => {
     .delete()
     .eq('id', invitationId)
 
+  return { error }
+}
+
+// ==================== TIME TRACKING ====================
+export const getTimeEntries = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('task_time_entries')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const createTimeEntry = async (entry: TimeEntryInsert) => {
+  const { data, error } = await supabase
+    .from('task_time_entries')
+    .insert(entry)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateTimeEntry = async (entryId: string, updates: Partial<TimeEntryInsert>) => {
+  const { data, error } = await supabase
+    .from('task_time_entries')
+    .update(updates)
+    .eq('id', entryId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteTimeEntry = async (entryId: string) => {
+  const { error } = await supabase
+    .from('task_time_entries')
+    .delete()
+    .eq('id', entryId)
+  return { error }
+}
+
+export const startTimeTracking = async (taskId: string, userId: string) => {
+  const now = new Date().toISOString()
+
+  // Start timer on task
+  const { data: task, error: taskError } = await supabase
+    .from('tasks')
+    .update({
+      timer_started_at: now,
+      timer_user_id: userId
+    })
+    .eq('id', taskId)
+    .select()
+    .single()
+
+  if (taskError) return { data: null, error: taskError }
+
+  return { data: task, error: null }
+}
+
+export const stopTimeTracking = async (taskId: string) => {
+  // Get current timer state
+  const { data: task, error: fetchError } = await supabase
+    .from('tasks')
+    .select('timer_started_at, timer_user_id')
+    .eq('id', taskId)
+    .single()
+
+  if (fetchError || !task) return { data: null, error: fetchError }
+
+  if (!task.timer_started_at || !task.timer_user_id) {
+    return { data: null, error: { message: 'No active timer' } }
+  }
+
+  const stoppedAt = new Date()
+  const startedAt = new Date(task.timer_started_at)
+  const durationSeconds = Math.floor((stoppedAt.getTime() - startedAt.getTime()) / 1000)
+
+  // Create time entry
+  const { data: entry, error: entryError } = await supabase
+    .from('task_time_entries')
+    .insert({
+      task_id: taskId,
+      user_id: task.timer_user_id,
+      duration_seconds: durationSeconds,
+      started_at: task.timer_started_at,
+      stopped_at: stoppedAt.toISOString()
+    })
+    .select()
+    .single()
+
+  if (entryError) return { data: null, error: entryError }
+
+  // Clear timer on task
+  await supabase
+    .from('tasks')
+    .update({
+      timer_started_at: null,
+      timer_user_id: null
+    })
+    .eq('id', taskId)
+
+  return { data: entry, error: null }
+}
+
+export const getTaskTimeSummary = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('task_time_entries')
+    .select('duration_seconds')
+    .eq('task_id', taskId)
+
+  if (error) return { total: 0, error }
+
+  const total = data?.reduce((sum, entry) => sum + (entry.duration_seconds || 0), 0) || 0
+  return { total, error: null }
+}
+
+export const getUserTimeSummary = async (userId: string, startDate?: string, endDate?: string) => {
+  let query = supabase
+    .from('task_time_entries')
+    .select('duration_seconds, task_id, tasks(title)')
+    .eq('user_id', userId)
+
+  if (startDate) {
+    query = query.gte('created_at', startDate)
+  }
+  if (endDate) {
+    query = query.lte('created_at', endDate)
+  }
+
+  const { data, error } = await query
+
+  if (error) return { data: null, total: 0, error }
+
+  const total = data?.reduce((sum, entry) => sum + (entry.duration_seconds || 0), 0) || 0
+  return { data, total, error: null }
+}
+
+// ==================== TASK DEPENDENCIES ====================
+export const getTaskDependencies = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('task_dependencies')
+    .select(`
+      *,
+      depends_on_task:tasks!task_dependencies_depends_on_task_id_fkey(id, title, due_date, priority)
+    `)
+    .eq('task_id', taskId)
+  return { data, error }
+}
+
+export const getTaskDependents = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('task_dependencies')
+    .select(`
+      *,
+      task:tasks!task_dependencies_task_id_fkey(id, title, due_date, priority)
+    `)
+    .eq('depends_on_task_id', taskId)
+  return { data, error }
+}
+
+export const addTaskDependency = async (dependency: TaskDependencyInsert) => {
+  const { data, error } = await supabase
+    .from('task_dependencies')
+    .insert(dependency)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const removeTaskDependency = async (dependencyId: string) => {
+  const { error } = await supabase
+    .from('task_dependencies')
+    .delete()
+    .eq('id', dependencyId)
+  return { error }
+}
+
+export const checkCircularDependency = async (taskId: string, dependsOnTaskId: string): Promise<boolean> => {
+  // Check if dependsOnTaskId depends on taskId (directly or indirectly)
+  const visited = new Set<string>()
+  const queue = [dependsOnTaskId]
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+    if (currentId === taskId) return true
+    if (visited.has(currentId)) continue
+    visited.add(currentId)
+
+    const { data } = await supabase
+      .from('task_dependencies')
+      .select('depends_on_task_id')
+      .eq('task_id', currentId)
+
+    if (data) {
+      queue.push(...data.map(d => d.depends_on_task_id))
+    }
+  }
+
+  return false
+}
+
+// ==================== RECURRING PATTERNS ====================
+export const getRecurringPattern = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('recurring_patterns')
+    .select('*')
+    .eq('task_id', taskId)
+    .maybeSingle()
+  return { data, error }
+}
+
+export const getRecurringTasks = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('recurring_patterns')
+    .select(`
+      *,
+      tasks!recurring_patterns_task_id_fkey(*)
+    `)
+    .eq('tasks.user_id', userId)
+    .eq('is_active', true)
+  return { data, error }
+}
+
+export const createRecurringPattern = async (pattern: RecurringPatternInsert) => {
+  const { data, error } = await supabase
+    .from('recurring_patterns')
+    .insert(pattern)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateRecurringPattern = async (patternId: string, updates: RecurringPatternUpdate) => {
+  const { data, error } = await supabase
+    .from('recurring_patterns')
+    .update(updates)
+    .eq('id', patternId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteRecurringPattern = async (patternId: string) => {
+  const { error } = await supabase
+    .from('recurring_patterns')
+    .delete()
+    .eq('id', patternId)
+  return { error }
+}
+
+export const calculateNextOccurrence = (pattern: RecurringPattern): Date | null => {
+  if (!pattern.is_active) return null
+
+  const now = new Date()
+  let next = pattern.next_occurrence ? new Date(pattern.next_occurrence) : new Date()
+
+  switch (pattern.frequency) {
+    case 'daily':
+      next.setDate(next.getDate() + pattern.interval_value)
+      break
+    case 'weekly':
+      if (pattern.days_of_week && pattern.days_of_week.length > 0) {
+        // Find next day in days_of_week
+        const currentDay = next.getDay()
+        const sortedDays = [...pattern.days_of_week].sort((a, b) => a - b)
+        let foundDay = sortedDays.find(d => d > currentDay)
+
+        if (!foundDay) {
+          // Move to next week
+          next.setDate(next.getDate() + (7 - currentDay + sortedDays[0]))
+        } else {
+          next.setDate(next.getDate() + (foundDay - currentDay))
+        }
+      } else {
+        next.setDate(next.getDate() + 7 * pattern.interval_value)
+      }
+      break
+    case 'monthly':
+      if (pattern.day_of_month) {
+        next.setMonth(next.getMonth() + pattern.interval_value)
+        next.setDate(pattern.day_of_month)
+      } else {
+        next.setMonth(next.getMonth() + pattern.interval_value)
+      }
+      break
+    case 'yearly':
+      next.setFullYear(next.getFullYear() + pattern.interval_value)
+      break
+  }
+
+  // Check end date
+  if (pattern.end_date && next > new Date(pattern.end_date)) {
+    return null
+  }
+
+  return next
+}
+
+// ==================== TASK TEMPLATES ====================
+export const getTaskTemplates = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('task_templates')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getTaskTemplate = async (templateId: string) => {
+  const { data, error } = await supabase
+    .from('task_templates')
+    .select('*')
+    .eq('id', templateId)
+    .single()
+  return { data, error }
+}
+
+export const createTaskTemplate = async (template: TaskTemplateInsert) => {
+  const { data, error } = await supabase
+    .from('task_templates')
+    .insert(template)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateTaskTemplate = async (templateId: string, updates: TaskTemplateUpdate) => {
+  const { data, error } = await supabase
+    .from('task_templates')
+    .update(updates)
+    .eq('id', templateId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteTaskTemplate = async (templateId: string) => {
+  const { error } = await supabase
+    .from('task_templates')
+    .delete()
+    .eq('id', templateId)
+  return { error }
+}
+
+export const createTaskFromTemplate = async (
+  templateId: string,
+  overrides: {
+    board_id: string
+    column_id: string
+    user_id: string
+    title?: string
+    description?: string
+  }
+) => {
+  const { data: template, error: templateError } = await getTaskTemplate(templateId)
+
+  if (templateError || !template) {
+    return { data: null, error: templateError }
+  }
+
+  const taskData: TaskInsert = {
+    board_id: overrides.board_id,
+    column_id: overrides.column_id,
+    user_id: overrides.user_id,
+    title: overrides.title || template.title_template || 'Untitled Task',
+    description: overrides.description || template.description_template || null,
+    priority: template.priority,
+    position: 0,
+    is_archived: false
+  }
+
+  const { data: task, error: taskError } = await supabase
+    .from('tasks')
+    .insert(taskData)
+    .select()
+    .single()
+
+  if (taskError || !task) {
+    return { data: null, error: taskError }
+  }
+
+  // Add default tags
+  if (template.default_tags && template.default_tags.length > 0) {
+    for (const tag of template.default_tags) {
+      await supabase.from('tags').insert({ task_id: task.id, name: tag })
+    }
+  }
+
+  // Add default labels
+  if (template.default_labels && template.default_labels.length > 0) {
+    for (const labelId of template.default_labels) {
+      await supabase.from('task_labels').insert({ task_id: task.id, label_id: labelId })
+    }
+  }
+
+  // Add subtasks
+  if (template.subtask_templates && template.subtask_templates.length > 0) {
+    for (const subtask of template.subtask_templates) {
+      await supabase.from('subtasks').insert({
+        task_id: task.id,
+        title: subtask.title,
+        position: subtask.position
+      })
+    }
+  }
+
+  return { data: task, error: null }
+}
+
+// ==================== ACTIVITY LOG ====================
+export const logActivity = async (log: ActivityLogInsert) => {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .insert(log)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getActivityLog = async (
+  boardId?: string,
+  taskId?: string,
+  userId?: string,
+  limit: number = 50
+) => {
+  let query = supabase
+    .from('activity_logs')
+    .select(`
+      *,
+      profiles(full_name, avatar_url, email)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (boardId) {
+    query = query.eq('board_id', boardId)
+  }
+  if (taskId) {
+    query = query.eq('task_id', taskId)
+  }
+  if (userId) {
+    query = query.eq('user_id', userId)
+  }
+
+  const { data, error } = await query
+  return { data, error }
+}
+
+export const getTaskActivity = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select(`
+      *,
+      profiles(full_name, avatar_url, email)
+    `)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const getBoardActivity = async (boardId: string, limit: number = 100) => {
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select(`
+      *,
+      profiles(full_name, avatar_url, email),
+      tasks(id, title)
+    `)
+    .eq('board_id', boardId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  return { data, error }
+}
+
+// ==================== BOARD MEMBERS ====================
+export const getBoardMembers = async (boardId: string) => {
+  const { data, error } = await supabase
+    .from('board_members')
+    .select(`
+      *,
+      profiles(full_name, avatar_url, email)
+    `)
+    .eq('board_id', boardId)
+    .order('created_at')
+  return { data, error }
+}
+
+export const addBoardMember = async (member: BoardMemberInsert) => {
+  const { data, error } = await supabase
+    .from('board_members')
+    .insert(member)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateBoardMember = async (memberId: string, updates: BoardMemberUpdate) => {
+  const { data, error } = await supabase
+    .from('board_members')
+    .update(updates)
+    .eq('id', memberId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const removeBoardMember = async (memberId: string) => {
+  const { error } = await supabase
+    .from('board_members')
+    .delete()
+    .eq('id', memberId)
+  return { error }
+}
+
+export const getUserBoards = async (userId: string) => {
+  // Get boards owned by user
+  const { data: ownedBoards, error: ownedError } = await supabase
+    .from('boards')
+    .select('*')
+    .eq('user_id', userId)
+
+  // Get boards where user is a member
+  const { data: memberBoards, error: memberError } = await supabase
+    .from('board_members')
+    .select(`
+      role,
+      boards(*)
+    `)
+    .eq('user_id', userId)
+
+  if (ownedError || memberError) {
+    return { data: null, error: ownedError || memberError }
+  }
+
+  const boards = [
+    ...(ownedBoards || []).map(b => ({ ...b, membership_role: 'owner' as const })),
+    ...(memberBoards || []).map((m: any) => ({ ...m.boards, membership_role: m.role }))
+  ]
+
+  return { data: boards, error: null }
+}
+
+export const createBoardWithMember = async (userId: string, title: string, description?: string) => {
+  const { data: board, error: boardError } = await supabase
+    .from('boards')
+    .insert({
+      user_id: userId,
+      title,
+      description: description || null,
+      is_default: false
+    })
+    .select()
+    .single()
+
+  if (boardError || !board) {
+    return { data: null, error: boardError }
+  }
+
+  // Create columns for new board
+  await createColumns(board.id)
+
+  return { data: board, error: null }
+}
+
+export const updateBoard = async (boardId: string, updates: { title?: string; description?: string }) => {
+  const { data, error } = await supabase
+    .from('boards')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', boardId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const deleteBoard = async (boardId: string) => {
+  const { error } = await supabase
+    .from('boards')
+    .delete()
+    .eq('id', boardId)
   return { error }
 }

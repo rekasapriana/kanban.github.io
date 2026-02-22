@@ -1,0 +1,207 @@
+.boardSwitcher {
+  position: relative;
+}
+
+.switcherBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  max-width: 250px;
+}
+
+.switcherBtn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+}
+
+.switcherBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.switcherIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.switcherText {
+  flex: 1;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roleBadge {
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.chevron {
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 280px;
+  max-width: 320px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.dropdownHeader {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.boardList {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.boardItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.boardItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.boardItem.active {
+  background: var(--accent-light);
+}
+
+.boardIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.boardItem.active .boardIcon {
+  background: var(--accent);
+  color: white;
+}
+
+.boardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.boardName {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.boardDesc {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.itemRoleBadge {
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.noBoards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+}
+
+.noBoards svg {
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--spacing-sm);
+  opacity: 0.5;
+}
+
+.noBoards p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.dropdownFooter {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.createBoardBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-sm);
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.createBoardBtn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+}

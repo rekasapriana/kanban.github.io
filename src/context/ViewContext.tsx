@@ -15,6 +15,11 @@ type ViewType =
   | 'settings'
   | 'shortcuts'
   | 'help'
+  | 'gantt'
+  | 'workload'
+  | 'timeline'
+  | 'templates'
+  | 'activity'
 
 interface ViewContextType {
   currentView: ViewType

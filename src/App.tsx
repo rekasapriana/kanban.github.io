@@ -25,7 +25,12 @@ import {
   ReportsView,
   NotificationsView,
   SettingsView,
-  HelpView
+  HelpView,
+  GanttView,
+  WorkloadView,
+  TimelineView,
+  TemplatesView,
+  ActivityView
 } from './components/Views'
 import styles from './App.module.css'
 
@@ -68,6 +73,11 @@ function MainContent() {
       case 'notifications': return <NotificationsView key="notifications" />
       case 'settings': return <SettingsView key="settings" />
       case 'help': return <HelpView key="help" />
+      case 'gantt': return <GanttView key="gantt" />
+      case 'workload': return <WorkloadView key="workload" />
+      case 'timeline': return <TimelineView key="timeline" />
+      case 'templates': return <TemplatesView key="templates" />
+      case 'activity': return <ActivityView key="activity" />
       default: return <Board key="board-default" />
     }
   }, [currentView])
