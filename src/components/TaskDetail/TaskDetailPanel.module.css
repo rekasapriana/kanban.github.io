@@ -26,11 +26,13 @@
 /* Header */
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--border-color);
   gap: var(--spacing-sm);
+  position: relative;
+  z-index: 10;
 }
 
 .header h2 {
@@ -46,6 +48,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .watchBtn {
