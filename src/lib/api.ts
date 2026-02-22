@@ -14,7 +14,8 @@ import type {
   RecurringPattern, RecurringPatternInsert, RecurringPatternUpdate,
   TaskTemplate, TaskTemplateInsert, TaskTemplateUpdate,
   ActivityLog, ActivityLogInsert,
-  BoardMember, BoardMemberInsert, BoardMemberUpdate
+  BoardMember, BoardMemberInsert, BoardMemberUpdate,
+  TaskWatcherInsert, ColumnUpdate
 } from '../types/database'
 
 // ==================== AUTH ====================
@@ -183,6 +184,25 @@ export const createColumns = async (boardId: string) => {
   return { data, error }
 }
 
+export const updateColumn = async (columnId: string, updates: ColumnUpdate) => {
+  const { data, error } = await supabase
+    .from('columns')
+    .update(updates)
+    .eq('id', columnId)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const getColumnTaskCount = async (columnId: string) => {
+  const { count, error } = await supabase
+    .from('tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('column_id', columnId)
+    .eq('is_archived', false)
+  return { count: count || 0, error }
+}
+
 // ==================== TASKS ====================
 export const getTasks = async (boardId: string) => {
   const { data, error } = await supabase
@@ -314,6 +334,31 @@ export const getAssignedTasks = async (userId: string) => {
   return { data: tasksWithAssignees, error: null }
 }
 
+export const getDeletedTasks = async (boardId: string) => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      tags (*),
+      subtasks (*),
+      task_labels (
+        id,
+        label_id,
+        labels (*)
+      ),
+      projects (*)
+    `)
+    .eq('board_id', boardId)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+
+  if (error || !data) {
+    return { data: [], error }
+  }
+
+  return { data, error: null }
+}
+
 export const createTask = async (task: TaskInsert) => {
   const { data, error } = await supabase
     .from('tasks')
@@ -339,6 +384,94 @@ export const deleteTask = async (taskId: string) => {
     .delete()
     .eq('id', taskId)
   return { error }
+}
+
+export const duplicateTask = async (taskId: string, userId: string) => {
+  // Get the original task with all related data
+  const { data: originalTask, error: fetchError } = await supabase
+    .from('tasks')
+    .select(`
+      *,
+      tags (*),
+      subtasks (*),
+      task_labels (
+        id,
+        label_id,
+        labels (*)
+      )
+    `)
+    .eq('id', taskId)
+    .single()
+
+  if (fetchError || !originalTask) {
+    return { data: null, error: fetchError }
+  }
+
+  // Get current tasks in the same column to calculate position
+  const { data: columnTasks } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('column_id', originalTask.column_id)
+
+  const newPosition = columnTasks?.length || 0
+
+  // Create the duplicate task
+  const newTask: TaskInsert = {
+    board_id: originalTask.board_id,
+    column_id: originalTask.column_id,
+    user_id: userId,
+    title: `${originalTask.title} (Copy)`,
+    description: originalTask.description,
+    priority: originalTask.priority,
+    due_date: null, // Don't copy due date
+    position: newPosition,
+    is_archived: false,
+    project_id: originalTask.project_id
+  }
+
+  const { data: duplicatedTask, error: createError } = await supabase
+    .from('tasks')
+    .insert(newTask)
+    .select()
+    .single()
+
+  if (createError || !duplicatedTask) {
+    return { data: null, error: createError }
+  }
+
+  // Copy tags
+  if (originalTask.tags && originalTask.tags.length > 0) {
+    for (const tag of originalTask.tags) {
+      await supabase
+        .from('tags')
+        .insert({ task_id: duplicatedTask.id, name: tag.name })
+    }
+  }
+
+  // Copy subtasks (uncompleted)
+  if (originalTask.subtasks && originalTask.subtasks.length > 0) {
+    for (let i = 0; i < originalTask.subtasks.length; i++) {
+      await supabase
+        .from('subtasks')
+        .insert({
+          task_id: duplicatedTask.id,
+          title: originalTask.subtasks[i].title,
+          position: i,
+          is_completed: false // Reset completion status
+        })
+    }
+  }
+
+  // Copy labels
+  if (originalTask.task_labels && originalTask.task_labels.length > 0) {
+    for (const label of originalTask.task_labels) {
+      await supabase
+        .from('task_labels')
+        .insert({ task_id: duplicatedTask.id, label_id: label.label_id })
+    }
+  }
+
+  return { data: duplicatedTask, error: null }
 }
 
 // ==================== TAGS ====================
@@ -501,28 +634,63 @@ export const exportData = (board: Board, columns: Column[], tasks: Task[]) => {
 
 // ==================== PROJECTS ====================
 export const getProjects = async (userId: string) => {
-  const { data, error } = await supabase
+  // Get projects owned by the user
+  const { data: ownedProjects, error: ownedError } = await supabase
     .from('projects')
     .select('*')
     .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
-  return { data, error }
+
+  // Try to get projects where user is a member (might fail if table doesn't exist)
+  let memberProjects: any[] = []
+  try {
+    const { data: memberData } = await supabase
+      .from('project_members')
+      .select(`
+        projects (*)
+      `)
+      .eq('user_id', userId)
+
+    if (memberData) {
+      memberProjects = memberData
+    }
+  } catch (e) {
+    // Table might not exist yet, ignore
+    console.log('[getProjects] project_members table might not exist yet')
+  }
+
+  if (ownedError) {
+    return { data: null, error: ownedError }
+  }
+
+  // Combine and deduplicate projects
+  const allProjects: any[] = [...(ownedProjects || [])]
+  const ownedIds = new Set(allProjects.map(p => p.id))
+
+  if (memberProjects) {
+    memberProjects.forEach((mp: any) => {
+      if (mp.projects && !ownedIds.has(mp.projects.id)) {
+        allProjects.push(mp.projects)
+      }
+    })
+  }
+
+  // Sort by updated_at
+  allProjects.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+
+  return { data: allProjects, error: null }
 }
 
 export const getProjectsWithTaskCount = async (userId: string) => {
-  const { data: projects, error: projectsError } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
+  // Get all projects (owned + member of)
+  const { data: allProjects, error: projectsError } = await getProjects(userId)
 
-  if (projectsError || !projects) {
+  if (projectsError || !allProjects) {
     return { data: null, error: projectsError }
   }
 
   // Get task counts for each project
   const projectsWithCount = await Promise.all(
-    projects.map(async (project) => {
+    allProjects.map(async (project) => {
       const { count } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
@@ -797,6 +965,59 @@ export const getTeamMembers = async (userId: string) => {
   console.log('[getTeamMembers] Result - data:', data?.length || 0, 'members, error:', error)
 
   return { data, error }
+}
+
+// Get members of a specific project (via project_members table)
+// Excludes the project owner - only returns invited members
+export const getProjectMembers = async (projectId: string) => {
+  console.log('[getProjectMembers] Fetching members for project:', projectId)
+
+  // First get the project owner to exclude them
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('user_id')
+    .eq('id', projectId)
+    .single()
+
+  const ownerId = project?.user_id
+  console.log('[getProjectMembers] Project owner:', ownerId)
+
+  // Get members from project_members table
+  let members: any[] = []
+
+  try {
+    const { data, error } = await supabase
+      .from('project_members')
+      .select(`
+        *,
+        user_profile:profiles!project_members_user_id_fkey (id, full_name, email, avatar_url)
+      `)
+      .eq('project_id', projectId)
+      .order('created_at')
+
+    console.log('[getProjectMembers] project_members query - data:', data, 'error:', error)
+
+    if (!error && data && data.length > 0) {
+      // Filter out the project owner
+      members = data
+        .filter((pm: any) => pm.user_id !== ownerId)
+        .map((pm: any) => ({
+          id: pm.id,
+          user_id: pm.user_id,
+          project_id: pm.project_id,
+          role: pm.role,
+          full_name: pm.user_profile?.full_name,
+          email: pm.user_profile?.email,
+          avatar_url: pm.user_profile?.avatar_url,
+          auth_user_id: pm.user_id
+        }))
+    }
+  } catch (e) {
+    console.log('[getProjectMembers] project_members table might not exist:', e)
+  }
+
+  console.log('[getProjectMembers] Final result:', members.length, 'members (excluding owner)')
+  return { data: members, error: null }
 }
 
 export const createTeamMember = async (member: TeamMemberInsert) => {
@@ -1111,6 +1332,7 @@ export const createTeamInvitation = async (invitation: {
   email: string
   name: string
   role: 'admin' | 'member' | 'viewer'
+  project_id?: string
 }) => {
   console.log('[createTeamInvitation] Creating invitation:', invitation)
 
@@ -1129,13 +1351,32 @@ export const createTeamInvitation = async (invitation: {
     return { data: null, error: { message: 'User already invited' } }
   }
 
+  // Generate invitation token
+  const invitationToken = crypto.randomUUID()
+
   const { data, error } = await supabase
     .from('team_invitations')
-    .insert(invitation)
+    .insert({
+      ...invitation,
+      invitation_token: invitationToken
+    })
     .select()
     .single()
 
   console.log('[createTeamInvitation] Insert result:', { data, error })
+
+  // Get project info separately if project_id exists
+  if (data && data.project_id) {
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', data.project_id)
+      .single()
+
+    if (projectData) {
+      data.projects = projectData
+    }
+  }
 
   return { data, error }
 }
@@ -1575,8 +1816,10 @@ export const createTaskFromTemplate = async (
     title: overrides.title || template.title_template || 'Untitled Task',
     description: overrides.description || template.description_template || null,
     priority: template.priority,
+    due_date: null,
     position: 0,
-    is_archived: false
+    is_archived: false,
+    project_id: null
   }
 
   const { data: task, error: taskError } = await supabase
@@ -1788,4 +2031,154 @@ export const deleteBoard = async (boardId: string) => {
     .delete()
     .eq('id', boardId)
   return { error }
+}
+
+// ==================== TASK WATCHERS ====================
+export const getTaskWatchers = async (taskId: string) => {
+  const { data, error } = await supabase
+    .from('task_watchers')
+    .select(`
+      *,
+      profiles(full_name, avatar_url, email)
+    `)
+    .eq('task_id', taskId)
+  return { data, error }
+}
+
+export const addTaskWatcher = async (watcher: TaskWatcherInsert) => {
+  const { data, error } = await supabase
+    .from('task_watchers')
+    .insert(watcher)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const removeTaskWatcher = async (taskId: string, userId: string) => {
+  const { error } = await supabase
+    .from('task_watchers')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+  return { error }
+}
+
+export const isTaskWatched = async (taskId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from('task_watchers')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return { isWatched: !!data, error }
+}
+
+export const getWatchedTasks = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('task_watchers')
+    .select(`
+      task_id,
+      tasks(*)
+    `)
+    .eq('user_id', userId)
+  return { data, error }
+}
+
+export const toggleTaskWatcher = async (taskId: string, userId: string) => {
+  // Check if already watching
+  const { data: existing } = await supabase
+    .from('task_watchers')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (existing) {
+    // Remove watcher
+    const { error } = await supabase
+      .from('task_watchers')
+      .delete()
+      .eq('id', existing.id)
+    return { watching: false, error }
+  } else {
+    // Add watcher
+    const { error } = await supabase
+      .from('task_watchers')
+      .insert({ task_id: taskId, user_id: userId })
+    return { watching: true, error }
+  }
+}
+
+// ==================== BULK OPERATIONS ====================
+export const bulkDeleteTasks = async (taskIds: string[]) => {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .in('id', taskIds)
+  return { error }
+}
+
+export const bulkMoveTasks = async (taskIds: string[], columnId: string) => {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ column_id: columnId })
+    .in('id', taskIds)
+  return { error }
+}
+
+export const bulkUpdateTasks = async (taskIds: string[], updates: TaskUpdate) => {
+  const { error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .in('id', taskIds)
+  return { error }
+}
+
+// ==================== CSV EXPORT ====================
+export const exportToCSV = (board: Board, columns: Column[], tasks: Task[]) => {
+  const headers = [
+    'ID',
+    'Title',
+    'Description',
+    'Priority',
+    'Due Date',
+    'Column',
+    'Project',
+    'Labels',
+    'Tags',
+    'Subtasks',
+    'Created At',
+    'Is Archived'
+  ]
+
+  const rows = tasks.map(task => {
+    const column = columns.find(c => c.id === task.column_id)
+    const labels = task.task_labels?.map(tl => tl.labels.name).join('; ') || ''
+    const tags = task.tags?.map(t => t.name).join('; ') || ''
+    const subtasks = task.subtasks?.map(s => `${s.is_completed ? '[x]' : '[ ]'} ${s.title}`).join('; ') || ''
+
+    return [
+      task.id,
+      `"${(task.title || '').replace(/"/g, '""')}"`,
+      `"${(task.description || '').replace(/"/g, '""')}"`,
+      task.priority,
+      task.due_date || '',
+      column?.title || '',
+      task.projects?.name || '',
+      `"${labels}"`,
+      `"${tags}"`,
+      `"${subtasks}"`,
+      task.created_at,
+      task.is_archived ? 'Yes' : 'No'
+    ]
+  })
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `kanban-export-${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }

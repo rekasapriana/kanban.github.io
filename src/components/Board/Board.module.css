@@ -3,8 +3,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 150px;
+  padding: 24px 40px;
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* Board Header with Search */
@@ -12,8 +14,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 150px;
+  padding: 16px 40px;
   gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .searchBox {
@@ -24,8 +35,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 16px;
-  flex: 1;
-  max-width: 400px;
+  width: 320px;
 }
 
 .searchBox svg {
@@ -178,19 +188,20 @@
 .boardRow {
   display: flex;
   gap: 20px;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 /* Column Style */
 .column {
   background: #f8fafc;
   border-radius: 12px;
-  width: 420px;
-  flex: 0 0 420px;
+  width: 320px;
+  flex: 0 0 320px;
   display: flex;
   flex-direction: column;
   border: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  max-height: 80vh;
 }
 
 /* Column Header */
@@ -261,6 +272,26 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.taskList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.taskList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.taskList::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.taskList::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Empty State */
@@ -757,8 +788,8 @@
   }
 
   .column {
-    width: 240px;
-    flex: 0 0 240px;
+    width: 260px;
+    flex: 0 0 260px;
   }
 }
 
@@ -785,4 +816,231 @@
     flex: 0 0 auto;
     max-width: 400px;
   }
+}
+
+/* Column Actions (Settings) */
+.columnActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.columnSettingsBtn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.columnSettingsBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  opacity: 1;
+}
+
+.columnSettingsBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* WIP Limit Indicators */
+.wipAtLimit {
+  background: rgba(251, 191, 36, 0.4) !important;
+  animation: pulse-wip 2s infinite;
+}
+
+.wipOverLimit {
+  background: rgba(239, 68, 68, 0.5) !important;
+  animation: pulse-wip 1s infinite;
+}
+
+@keyframes pulse-wip {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.addTaskBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
+.addTaskBtn:disabled:hover {
+  color: #64748b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Task Selection Checkbox */
+.taskSelectionWrapper {
+  position: relative;
+}
+
+.taskCheckbox {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.task:hover .taskCheckbox {
+  opacity: 1;
+}
+
+.taskCheckbox:hover {
+  border-color: #4f46e5;
+}
+
+.taskCheckbox.checked {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  opacity: 1;
+}
+
+.taskCheckbox.checked svg {
+  color: white;
+}
+
+.taskCheckbox svg {
+  width: 12px;
+  height: 12px;
+  color: transparent;
+}
+
+.taskCheckbox.checked svg {
+  color: white;
+}
+
+.taskBulkSelected {
+  box-shadow: 0 0 0 2px #4f46e5;
+}
+
+/* Bulk Action Toolbar */
+.bulkActionToolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 1000;
+}
+
+.bulkCount {
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulkBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Select dropdown in bulk toolbar - white background for readability */
+select.bulkBtn {
+  background: white;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+}
+
+select.bulkBtn option {
+  background: white;
+  color: #1e293b;
+}
+
+.bulkBtn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+select.bulkBtn:hover {
+  background: #f8fafc;
+}
+
+.bulkBtn.danger {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.bulkBtn.danger:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
+.bulkBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bulkClose {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulkClose:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Cover Image on Task Card */
+.taskCover {
+  margin: -14px -14px 12px;
+  border-radius: 10px 10px 0 0;
+  overflow: hidden;
+  max-height: 100px;
+}
+
+.taskCover img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  display: block;
 }

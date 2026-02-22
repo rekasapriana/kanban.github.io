@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FiEdit2, FiTrash2, FiRotateCcw, FiMessageCircle, FiImage, FiCheckSquare, FiCalendar, FiFolder, FiStar, FiLock } from 'react-icons/fi'
+import { FiEdit2, FiTrash2, FiRotateCcw, FiCheckSquare, FiCalendar, FiFolder, FiStar, FiLock, FiCheck } from 'react-icons/fi'
 import type { Task } from '../../types/database'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { formatDateDisplay, getDateClass, isOverdue } from '../../utils/dateUtils'
 import { getStarredTaskIds, toggleStarredTask } from '../../lib/api'
 import { useTaskPermission } from '../../hooks/useTaskPermission'
+import QuickEdit from './QuickEdit'
 import styles from './Board.module.css'
 
 interface TaskCardProps {
@@ -18,10 +19,15 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, isArchived = false, isDragging = false, isDone = false }: TaskCardProps) {
-  const { openEditModal, deleteTask, restoreTask, openDetailPanel } = useBoard()
+  const { openEditModal, deleteTask, restoreTask, openDetailPanel, toggleSelectedTask, state } = useBoard()
   const { user, profile } = useAuth()
   const [isStarred, setIsStarred] = useState(false)
+  const [showQuickEdit, setShowQuickEdit] = useState(false)
+  const [quickEditPosition, setQuickEditPosition] = useState({ top: 0, left: 0 })
+  const cardRef = useRef<HTMLDivElement>(null)
   const { canMove, canEdit, canDelete, isOwner } = useTaskPermission(task)
+
+  const isSelected = state.selectedTaskIds.includes(task.id)
 
   const {
     attributes,
@@ -78,11 +84,6 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     deleteTask(task.id)
   }
 
-  const handleComment = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    openDetailPanel(task.id)
-  }
-
   const handleToggleStar = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!user) return
@@ -104,6 +105,30 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     }
   }
 
+  const handleQuickEdit = (e: React.MouseEvent) => {
+    if (!canEdit) return
+    e.stopPropagation()
+
+    // Calculate position for the popover
+    const rect = cardRef.current?.getBoundingClientRect()
+    if (rect) {
+      // Position below the card
+      let top = rect.bottom + 8
+      let left = rect.left
+
+      // Adjust if popover would go off screen
+      if (left + 320 > window.innerWidth) {
+        left = window.innerWidth - 320 - 16
+      }
+      if (top + 400 > window.innerHeight) {
+        top = rect.top - 400 - 8 // Position above instead
+      }
+
+      setQuickEditPosition({ top, left: Math.max(16, left) })
+      setShowQuickEdit(true)
+    }
+  }
+
   if (isDragging) {
     return (
       <div
@@ -120,16 +145,43 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     )
   }
 
+  // Callback ref to handle both refs
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+      setNodeRef(node)
+    }
+  }, [setNodeRef])
+
   return (
+    <>
     <div
-      ref={setNodeRef}
+      ref={setRefs}
       style={style}
-      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''}`}
+      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''} ${isSelected ? styles.taskBulkSelected : ''}`}
       data-priority={task.priority}
       onClick={() => openDetailPanel(task.id)}
       {...attributes}
       {...(canMove ? listeners : {})}
     >
+      {/* Bulk Selection Checkbox */}
+      <div
+        className={`${styles.taskCheckbox} ${isSelected ? styles.checked : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          toggleSelectedTask(task.id, task.column_id)
+        }}
+      >
+        {isSelected && <FiCheck />}
+      </div>
+
+      {/* Cover Image */}
+      {task.cover_image_url && (
+        <div className={styles.taskCover}>
+          <img src={task.cover_image_url} alt="" />
+        </div>
+      )}
+
       {/* Lock indicator for non-movable tasks */}
       {!canMove && !isDragging && (
         <div className={styles.lockIndicator} title="Only task creator and admins can move this task">
@@ -176,15 +228,9 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
             </>
           ) : (
             <>
-              <button className={styles.actionIcon} onClick={handleComment} title="Comment">
-                <FiMessageCircle />
-              </button>
-              <button className={styles.actionIcon} onClick={handleComment} title="Add Image">
-                <FiImage />
-              </button>
               {canEdit && !isDone && (
                 <>
-                  <button className={styles.actionIcon} onClick={handleEdit} title="Edit">
+                  <button className={styles.actionIcon} onClick={handleQuickEdit} title="Quick Edit">
                     <FiEdit2 />
                   </button>
                 </>
@@ -201,11 +247,6 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
 
       {/* Task Title */}
       <p className={styles.taskText}>{task.title}</p>
-
-      {/* Description Preview */}
-      {task.description && (
-        <p className={styles.taskDescription}>{task.description}</p>
-      )}
 
       {/* Labels */}
       {taskLabels.length > 0 && (
@@ -287,5 +328,15 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
         </div>
       </div>
     </div>
+
+    {/* Quick Edit Popover */}
+    {showQuickEdit && (
+      <QuickEdit
+        task={task}
+        position={quickEditPosition}
+        onClose={() => setShowQuickEdit(false)}
+      />
+    )}
+    </>
   )
 }

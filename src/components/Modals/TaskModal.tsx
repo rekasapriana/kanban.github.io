@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, FormEvent, KeyboardEvent } from 'react'
-import { FiPlus, FiEdit2, FiType, FiFlag, FiCalendar, FiTag, FiAlignLeft, FiCheckSquare, FiX, FiFolder, FiBookmark, FiUser, FiFileText, FiChevronDown, FiPaperclip } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiType, FiFlag, FiCalendar, FiTag, FiAlignLeft, FiCheckSquare, FiX, FiFolder, FiBookmark, FiUser, FiFileText, FiChevronDown, FiPaperclip, FiBell, FiList, FiImage } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
-import { getProjects, getLabels, getTeamMembers, getProfileByEmail, updateTeamMember, getTaskTemplates, uploadTaskAttachment } from '../../lib/api'
-import type { Project, Label, TeamMember, TaskTemplate } from '../../types/database'
+import { getProjects, getLabels, getTaskTemplates, getProjectMembers, uploadTaskAttachment } from '../../lib/api'
+import { supabase } from '../../lib/supabase'
+import type { Project, Label, TaskTemplate, CustomField } from '../../types/database'
 import Button from '../UI/Button'
+import { getReminderOptions, requestNotificationPermission, areNotificationsEnabled, scheduleReminder, calculateReminderTime } from '../../utils/reminderUtils'
+import type { ReminderOffset } from '../../utils/reminderUtils'
 import styles from './TaskModal.module.css'
 
 interface SubtaskForm {
@@ -16,6 +19,17 @@ interface SubtaskForm {
 interface PendingAttachment {
   file: File
   preview?: string
+}
+
+interface ProjectMember {
+  id: string
+  user_id: string
+  project_id: string
+  role: string
+  full_name: string | null
+  email: string | null
+  avatar_url: string | null
+  auth_user_id: string
 }
 
 export default function TaskModal() {
@@ -34,86 +48,90 @@ export default function TaskModal() {
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [labels, setLabels] = useState<Label[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
   const [templates, setTemplates] = useState<TaskTemplate[]>([])
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
+  const [reminder, setReminder] = useState<ReminderOffset | ''>('')
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({})
+  const [coverImageUrl, setCoverImageUrl] = useState('')
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!state.editingTask
 
-  // Load projects, labels, and team members
+  // Load projects, labels, and custom fields
   useEffect(() => {
     const loadData = async () => {
       if (!user) return
 
       console.log('[TaskModal] Loading data for user:', user.id)
 
-      const [projectsRes, labelsRes, membersRes, templatesRes] = await Promise.all([
+      const [projectsRes, labelsRes, templatesRes] = await Promise.all([
         getProjects(user.id),
         getLabels(user.id),
-        getTeamMembers(user.id),
         getTaskTemplates(user.id)
       ])
 
       console.log('[TaskModal] Projects:', projectsRes.data?.length || 0)
       console.log('[TaskModal] Labels:', labelsRes.data?.length || 0)
-      console.log('[TaskModal] Team Members raw:', membersRes.data)
-      console.log('[TaskModal] Team Members error:', membersRes.error)
 
       if (projectsRes.data) setProjects(projectsRes.data)
       if (labelsRes.data) setLabels(labelsRes.data)
       if (templatesRes.data) setTemplates(templatesRes.data)
 
-      // Process team members
-      if (membersRes.data && membersRes.data.length > 0) {
-        console.log('[TaskModal] Processing', membersRes.data.length, 'members...')
+      // Load custom fields for the board
+      if (state.board?.id) {
+        const { data: fieldsData } = await supabase
+          .from('custom_fields')
+          .select('*')
+          .eq('board_id', state.board.id)
+          .order('position', { ascending: true })
 
-        const linkedMembers = await Promise.all(
-          membersRes.data.map(async (member) => {
-            console.log('[TaskModal] Member:', member.name, '- auth_user_id:', member.auth_user_id, '- email:', member.email)
-
-            // If already linked, return as is
-            if (member.auth_user_id) {
-              console.log('[TaskModal] Member', member.name, 'already linked to auth user')
-              return member
-            }
-
-            // Try to find auth user by email
-            const { data: profile, error: profileError } = await getProfileByEmail(member.email)
-            console.log('[TaskModal] Profile lookup for', member.email, ':', profile ? 'found' : 'not found', 'error:', profileError)
-
-            if (profile) {
-              // Update team member with auth_user_id
-              console.log('[TaskModal] Attempting to link member', member.name, 'to auth user', profile.id)
-              const { error: updateError } = await updateTeamMember(member.id, { auth_user_id: profile.id })
-
-              if (updateError) {
-                console.error('[TaskModal] Failed to update member:', updateError)
-                return member
-              }
-
-              console.log('[TaskModal] Successfully linked member', member.name)
-              return { ...member, auth_user_id: profile.id }
-            }
-
-            console.log('[TaskModal] Member', member.name, 'has no auth account yet (pending signup)')
-            return member
-          })
-        )
-
-        const linkedCount = linkedMembers.filter(m => m.auth_user_id).length
-        const pendingCount = linkedMembers.filter(m => !m.auth_user_id).length
-        console.log('[TaskModal] Final result - Linked:', linkedCount, 'Pending signup:', pendingCount)
-
-        setTeamMembers(linkedMembers)
-      } else {
-        console.log('[TaskModal] No team members found for this user')
+        if (fieldsData) {
+          setCustomFields(fieldsData)
+          console.log('[TaskModal] Custom fields loaded:', fieldsData.length)
+        }
       }
     }
     loadData()
-  }, [user, state.isModalOpen])
+  }, [user, state.isModalOpen, state.board?.id])
+
+  // Load project members when project is selected
+  useEffect(() => {
+    const loadProjectMembers = async () => {
+      if (!projectId) {
+        setProjectMembers([])
+        setSelectedAssignees([])
+        return
+      }
+
+      setLoadingMembers(true)
+      console.log('[TaskModal] Loading members for project:', projectId)
+
+      const { data, error } = await getProjectMembers(projectId)
+
+      if (error) {
+        console.error('[TaskModal] Error loading project members:', error)
+        setProjectMembers([])
+      } else {
+        console.log('[TaskModal] Project members loaded:', data?.length || 0)
+        setProjectMembers(data || [])
+      }
+
+      setLoadingMembers(false)
+    }
+
+    loadProjectMembers()
+  }, [projectId])
+
+  // Handle project change - clear assignees
+  const handleProjectChange = (newProjectId: string) => {
+    setProjectId(newProjectId || null)
+    setSelectedAssignees([]) // Clear assignees when project changes
+  }
 
   // Load task data when editing
   useEffect(() => {
@@ -131,6 +149,7 @@ export default function TaskModal() {
       setProjectId(state.editingTask.project_id || null)
       setSelectedAssignees(state.editingTask.task_assignees?.map(ta => ta.user_id) || [])
       setSelectedLabels(state.editingTask.task_labels?.map(tl => tl.label_id) || [])
+      setCoverImageUrl(state.editingTask.cover_image_url || '')
     } else {
       resetForm()
     }
@@ -156,7 +175,10 @@ export default function TaskModal() {
     setSelectedAssignees([])
     setSelectedLabels([])
     setPendingAttachments([])
+    setReminder('')
     setShowTemplateDropdown(false)
+    setCustomFieldValues({})
+    setCoverImageUrl('')
   }
 
   // Attachment handlers
@@ -230,6 +252,35 @@ export default function TaskModal() {
       for (const attachment of pendingAttachments) {
         await uploadTaskAttachment(taskId, user.id, attachment.file)
       }
+    }
+
+    // Schedule reminder if set
+    if (taskId && reminder && dueDate) {
+      const reminderTime = calculateReminderTime(dueDate, reminder)
+      scheduleReminder(taskId, title.trim(), reminderTime)
+    }
+
+    // Save custom field values
+    if (taskId && Object.keys(customFieldValues).length > 0) {
+      for (const [fieldId, value] of Object.entries(customFieldValues)) {
+        if (value !== undefined && value !== '' && value !== null) {
+          await supabase
+            .from('custom_field_values')
+            .insert({
+              task_id: taskId,
+              field_id: fieldId,
+              value: { value }
+            })
+        }
+      }
+    }
+
+    // Save cover image URL
+    if (taskId && coverImageUrl) {
+      await supabase
+        .from('tasks')
+        .update({ cover_image_url: coverImageUrl })
+        .eq('id', taskId)
     }
 
     resetForm()
@@ -345,6 +396,96 @@ export default function TaskModal() {
     }
   }
 
+  // Render custom field input based on type
+  const renderCustomFieldInput = (field: CustomField) => {
+    const value = customFieldValues[field.id]
+
+    switch (field.field_type) {
+      case 'text':
+        return (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+            placeholder={`Enter ${field.name.toLowerCase()}...`}
+          />
+        )
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={value || ''}
+            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+            placeholder="0"
+          />
+        )
+      case 'date':
+        return (
+          <input
+            type="date"
+            value={value || ''}
+            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+          />
+        )
+      case 'select':
+        return (
+          <select
+            value={value || ''}
+            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+          >
+            <option value="">Select...</option>
+            {field.options?.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        )
+      case 'multiselect':
+        return (
+          <div className={styles.multiselectOptions}>
+            {field.options?.map(opt => (
+              <label key={opt.value} className={styles.checkboxOption}>
+                <input
+                  type="checkbox"
+                  checked={(value || []).includes(opt.value)}
+                  onChange={(e) => {
+                    const currentValues = value || []
+                    if (e.target.checked) {
+                      setCustomFieldValues({ ...customFieldValues, [field.id]: [...currentValues, opt.value] })
+                    } else {
+                      setCustomFieldValues({ ...customFieldValues, [field.id]: currentValues.filter((v: string) => v !== opt.value) })
+                    }
+                  }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        )
+      case 'checkbox':
+        return (
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={value || false}
+              onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.checked })}
+            />
+            Yes
+          </label>
+        )
+      case 'url':
+        return (
+          <input
+            type="url"
+            value={value || ''}
+            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+            placeholder="https://..."
+          />
+        )
+      default:
+        return null
+    }
+  }
+
   if (!state.isModalOpen) return null
 
   return (
@@ -426,10 +567,33 @@ export default function TaskModal() {
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high')}
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
                   <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Cover Image URL */}
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label>
+                  <FiImage />
+                  Cover Image URL
+                </label>
+                <input
+                  type="url"
+                  value={coverImageUrl}
+                  onChange={(e) => setCoverImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
+                {coverImageUrl && (
+                  <div className={styles.coverPreview}>
+                    <img src={coverImageUrl} alt="Cover preview" onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }} />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -442,7 +606,7 @@ export default function TaskModal() {
                 </label>
                 <select
                   value={projectId || ''}
-                  onChange={(e) => setProjectId(e.target.value || null)}
+                  onChange={(e) => handleProjectChange(e.target.value)}
                 >
                   <option value="">No Project</option>
                   {projects.map(project => (
@@ -454,45 +618,43 @@ export default function TaskModal() {
               </div>
             </div>
 
-            {/* Assignees - Multiple Selection */}
-            <div className={styles.formGroup}>
-              <label>
-                <FiUser />
-                Assignees ({selectedAssignees.length} selected)
-              </label>
-              <div className={styles.assigneesContainer}>
-                {teamMembers.filter(m => m.auth_user_id).length === 0 ? (
-                  <span className={styles.hint}>
-                    {teamMembers.length === 0
-                      ? 'No team members yet. Invite some in the Team page.'
-                      : `⚠️ ${teamMembers.length} member(s) invited but not yet signed up.`
-                    }
-                  </span>
-                ) : (
-                  <div className={styles.assigneesList}>
-                    {teamMembers
-                      .filter(m => m.auth_user_id)
-                      .map(member => (
+            {/* Assignees - Only show when project is selected */}
+            {projectId && (
+              <div className={styles.formGroup}>
+                <label>
+                  <FiUser />
+                  Assignees ({selectedAssignees.length} selected)
+                </label>
+                <div className={styles.assigneesContainer}>
+                  {loadingMembers ? (
+                    <span className={styles.hint}>Loading project members...</span>
+                  ) : projectMembers.length === 0 ? (
+                    <span className={styles.hint}>
+                      No members in this project yet. Invite members to the project first.
+                    </span>
+                  ) : (
+                    <div className={styles.assigneesList}>
+                      {projectMembers.map(member => (
                         <button
                           key={member.id}
                           type="button"
-                          className={`${styles.assigneeBtn} ${selectedAssignees.includes(member.auth_user_id!) ? styles.selected : ''}`}
+                          className={`${styles.assigneeBtn} ${selectedAssignees.includes(member.user_id) ? styles.selected : ''}`}
                           onClick={() => {
-                            if (selectedAssignees.includes(member.auth_user_id!)) {
-                              setSelectedAssignees(selectedAssignees.filter(id => id !== member.auth_user_id))
+                            if (selectedAssignees.includes(member.user_id)) {
+                              setSelectedAssignees(selectedAssignees.filter(id => id !== member.user_id))
                             } else {
-                              setSelectedAssignees([...selectedAssignees, member.auth_user_id!])
+                              setSelectedAssignees([...selectedAssignees, member.user_id])
                             }
                           }}
                         >
-                          {member.name}
+                          {member.full_name || member.email || 'Unknown'}
                         </button>
-                      ))
-                    }
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Due Date */}
             <div className={styles.formRow}>
@@ -508,6 +670,32 @@ export default function TaskModal() {
                 />
               </div>
             </div>
+
+            {/* Reminder */}
+            {dueDate && (
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label>
+                    <FiBell />
+                    Reminder
+                  </label>
+                  <select
+                    value={reminder}
+                    onChange={(e) => {
+                      setReminder(e.target.value as ReminderOffset | '')
+                      if (e.target.value && !areNotificationsEnabled()) {
+                        requestNotificationPermission()
+                      }
+                    }}
+                  >
+                    <option value="">No reminder</option>
+                    {getReminderOptions().map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Labels */}
             <div className={styles.formGroup}>
@@ -669,6 +857,27 @@ export default function TaskModal() {
                 </button>
               </div>
             </div>
+
+            {/* Custom Fields */}
+            {customFields.length > 0 && (
+              <div className={styles.customFieldsSection}>
+                <label className={styles.sectionLabel}>
+                  <FiList />
+                  Custom Fields
+                </label>
+                <div className={styles.customFieldsGrid}>
+                  {customFields.map(field => (
+                    <div key={field.id} className={styles.customField}>
+                      <label className={styles.customFieldLabel}>
+                        {field.name}
+                        {field.is_required && <span className={styles.required}>*</span>}
+                      </label>
+                      {renderCustomFieldInput(field)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.modalFooter}>

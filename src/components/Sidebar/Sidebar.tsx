@@ -16,7 +16,9 @@ import {
   FiUsers,
   FiClock,
   FiFileText,
-  FiActivity
+  FiActivity,
+  FiBarChart2,
+  FiZap
 } from 'react-icons/fi'
 import styles from './Sidebar.module.css'
 
@@ -64,6 +66,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   // Views menu items
   const viewItems: { id: ViewType; label: string; icon: typeof FiColumns }[] = [
+    { id: 'reports', label: 'Reports', icon: FiBarChart2 },
+    { id: 'automation', label: 'Automation', icon: FiZap },
+    { id: 'custom-fields', label: 'Custom Fields', icon: FiFileText },
     { id: 'gantt', label: 'Gantt Chart', icon: FiLayers },
     { id: 'timeline', label: 'Timeline', icon: FiClock },
     { id: 'workload', label: 'Workload', icon: FiUsers },

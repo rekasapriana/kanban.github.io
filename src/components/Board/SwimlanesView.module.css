@@ -1,0 +1,194 @@
+.container {
+  padding: 24px;
+  overflow-x: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.groupByToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.groupByToggle span {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.groupBtn {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.groupBtn:hover {
+  background: #f8fafc;
+}
+
+.groupBtn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.swimlanesContainer {
+  background: #f1f5f9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.headerRow {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.swimlaneHeader {
+  width: 160px;
+  min-width: 160px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+}
+
+.columnHeader {
+  flex: 1;
+  min-width: 250px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-right: 1px solid #e2e8f0;
+}
+
+.columnHeader:last-child {
+  border-right: none;
+}
+
+.columnTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.columnCount {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.swimlaneRow {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.swimlaneRow:last-child {
+  border-bottom: none;
+}
+
+.swimlaneLabel {
+  width: 160px;
+  min-width: 160px;
+  padding: 12px 16px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  border-left: 4px solid;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.swimlaneName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.swimlaneCount {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.cell {
+  flex: 1;
+  min-width: 250px;
+  min-height: 100px;
+  padding: 8px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+}
+
+.cell:last-child {
+  border-right: none;
+}
+
+.cellTasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.taskWrapper {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.taskWrapper:hover {
+  transform: translateX(4px);
+}
+
+.emptyCell {
+  height: 100%;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 6px;
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .swimlaneHeader,
+  .swimlaneLabel {
+    width: 120px;
+    min-width: 120px;
+  }
+
+  .cell {
+    min-width: 200px;
+  }
+}

@@ -1,18 +1,39 @@
 import { useState, useRef, useEffect } from 'react'
-import { FiEdit2, FiMoon, FiSun, FiHelpCircle, FiBarChart2, FiSettings, FiUsers, FiLogOut } from 'react-icons/fi'
+import { FiEdit2, FiMoon, FiSun, FiHelpCircle, FiBarChart2, FiSettings, FiUsers, FiLogOut, FiDownload, FiUpload, FiFileText, FiFile } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useView } from '../../context/ViewContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useBoard } from '../../context/BoardContext'
+import ImportModal from '../Modals/ImportModal'
+import { downloadJSON, downloadCSV, ExportOptions } from '../../utils/exportUtils'
 import styles from './Header.module.css'
 
 export default function UserMenu() {
   const { user, profile, signOutUser } = useAuth()
   const { setView } = useView()
   const { theme, toggleTheme } = useTheme()
+  const { state, exportData } = useBoard()
   const [isOpen, setIsOpen] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const displayName = profile?.full_name || user?.user_metadata?.name || 'User'
+
+  const handleExport = (format: 'json' | 'csv') => {
+    if (!state.board || !state.columns || !state.tasks) return
+
+    const options: ExportOptions = {
+      format,
+      includeArchived: false
+    }
+
+    if (format === 'json') {
+      downloadJSON(state.board, state.columns, state.tasks, options)
+    } else {
+      downloadCSV(state.columns, state.tasks, options)
+    }
+    setIsOpen(false)
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -81,6 +102,31 @@ export default function UserMenu() {
           </div>
           <div className={styles.userDropdownDivider} />
           <div className={styles.userDropdownSection}>
+            <span className={styles.userDropdownSectionTitle}>DATA</span>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => handleExport('json')}
+            >
+              <FiFileText /> Export as JSON
+            </button>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => handleExport('csv')}
+            >
+              <FiFile /> Export as CSV
+            </button>
+            <button
+              className={styles.userDropdownItem}
+              onClick={() => {
+                setShowImportModal(true)
+                setIsOpen(false)
+              }}
+            >
+              <FiUpload /> Import Tasks
+            </button>
+          </div>
+          <div className={styles.userDropdownDivider} />
+          <div className={styles.userDropdownSection}>
             <span className={styles.userDropdownSectionTitle}>PREFERENCES</span>
             <button
               className={styles.userDropdownItem}
@@ -121,6 +167,11 @@ export default function UserMenu() {
             <FiLogOut /> Log Out
           </button>
         </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportModal onClose={() => setShowImportModal(false)} />
       )}
     </div>
   )

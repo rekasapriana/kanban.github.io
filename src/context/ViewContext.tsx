@@ -20,6 +20,8 @@ type ViewType =
   | 'timeline'
   | 'templates'
   | 'activity'
+  | 'automation'
+  | 'custom-fields'
 
 interface ViewContextType {
   currentView: ViewType

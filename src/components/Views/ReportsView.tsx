@@ -1,7 +1,16 @@
 import { useState, useMemo } from 'react'
 import { useBoard } from '../../context/BoardContext'
-import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiClock, FiTarget, FiAward, FiZap } from 'react-icons/fi'
+import {
+  FiBarChart2, FiTrendingUp, FiCheckCircle, FiClock, FiTarget, FiAward,
+  FiZap, FiUsers, FiCalendar, FiFlag, FiFolder, FiActivity
+} from 'react-icons/fi'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend
+} from 'recharts'
 import styles from './Views.module.css'
+
+const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 export default function ReportsView() {
   const { state } = useBoard()
@@ -29,21 +38,111 @@ export default function ReportsView() {
 
     const completionRate = total > 0 ? Math.round((done / total) * 100) : 0
 
-    return { total, todo, inProgress, review, done, high, medium, low, completionRate }
+    // Calculate overdue tasks
+    const now = new Date()
+    const overdue = tasks.filter(t => {
+      if (!t.due_date) return false
+      return new Date(t.due_date) < now && t.column_id !== doneColumn?.id
+    }).length
+
+    // Tasks with due dates
+    const withDueDate = tasks.filter(t => t.due_date).length
+
+    // Tasks by project
+    const projectCounts: Record<string, number> = {}
+    tasks.forEach(t => {
+      if (t.project_id) {
+        projectCounts[t.project_id] = (projectCounts[t.project_id] || 0) + 1
+      }
+    })
+
+    return {
+      total, todo, inProgress, review, done, high, medium, low,
+      completionRate, overdue, withDueDate, projectCounts
+    }
   }, [tasks, columns])
 
-  // Weekly data
-  const weeklyData = [
-    { day: 'Mon', completed: 5, created: 3 },
-    { day: 'Tue', completed: 8, created: 6 },
-    { day: 'Wed', completed: 4, created: 7 },
-    { day: 'Thu', completed: 12, created: 4 },
-    { day: 'Fri', completed: 6, created: 8 },
-    { day: 'Sat', completed: 3, created: 2 },
-    { day: 'Sun', completed: 2, created: 1 },
-  ]
+  // Real weekly data based on task creation dates
+  const weeklyData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const today = new Date()
+    const data = []
 
-  const maxCompleted = Math.max(...weeklyData.map(d => d.completed))
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      const dayName = days[date.getDay()]
+
+      const dayStart = new Date(date.setHours(0, 0, 0, 0))
+      const dayEnd = new Date(date.setHours(23, 59, 59, 999))
+
+      const created = tasks.filter(t => {
+        const createdDate = new Date(t.created_at)
+        return createdDate >= dayStart && createdDate <= dayEnd
+      }).length
+
+      const completed = tasks.filter(t => {
+        const doneColumn = columns.find(c => c.title.toLowerCase() === 'done')
+        if (t.column_id !== doneColumn?.id) return false
+        const updatedDate = new Date(t.updated_at)
+        return updatedDate >= dayStart && updatedDate <= dayEnd
+      }).length
+
+      data.push({ day: dayName, created, completed })
+    }
+
+    return data
+  }, [tasks, columns])
+
+  // Status distribution data for pie chart
+  const statusDistribution = useMemo(() => {
+    return columns
+      .filter(c => c.title.toLowerCase() !== 'archive')
+      .map((column, index) => ({
+        name: column.title,
+        value: tasks.filter(t => t.column_id === column.id).length,
+        color: column.color || COLORS[index % COLORS.length]
+      }))
+      .filter(d => d.value > 0)
+  }, [columns, tasks])
+
+  // Priority distribution data
+  const priorityData = [
+    { name: 'High', value: stats.high, color: '#ef4444' },
+    { name: 'Medium', value: stats.medium, color: '#f59e0b' },
+    { name: 'Low', value: stats.low, color: '#22c55e' }
+  ].filter(d => d.value > 0)
+
+  // Monthly trend data (last 6 months)
+  const monthlyTrend = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const today = new Date()
+    const data = []
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      const monthName = months[date.getMonth()]
+
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
+
+      const created = tasks.filter(t => {
+        const createdDate = new Date(t.created_at)
+        return createdDate >= monthStart && createdDate <= monthEnd
+      }).length
+
+      const completed = tasks.filter(t => {
+        const doneColumn = columns.find(c => c.title.toLowerCase() === 'done')
+        if (t.column_id !== doneColumn?.id) return false
+        const updatedDate = new Date(t.updated_at)
+        return updatedDate >= monthStart && updatedDate <= monthEnd
+      }).length
+
+      data.push({ month: monthName, created, completed })
+    }
+
+    return data
+  }, [tasks, columns])
 
   // Performance score
   const performanceScore = useMemo(() => {
@@ -53,6 +152,23 @@ export default function ReportsView() {
     const doneWeight = (stats.done / stats.total) * 100 * 0.3
     return Math.round(completionWeight + progressWeight + doneWeight)
   }, [stats])
+
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className={styles.chartTooltip}>
+          <p className={styles.tooltipLabel}>{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className={styles.tooltipValue} style={{ color: entry.color }}>
+              {entry.name}: {entry.value}
+            </p>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <div className={styles.reportsView}>
@@ -147,151 +263,170 @@ export default function ReportsView() {
         </div>
       </div>
 
+      {/* Quick Stats Row */}
+      <div className={styles.quickStatsRow}>
+        <div className={styles.quickStatCard}>
+          <div className={styles.quickStatIcon} style={{ background: '#fef2f2', color: '#ef4444' }}>
+            <FiCalendar />
+          </div>
+          <div className={styles.quickStatInfo}>
+            <span className={styles.quickStatValue}>{stats.overdue}</span>
+            <span className={styles.quickStatLabel}>Overdue Tasks</span>
+          </div>
+        </div>
+        <div className={styles.quickStatCard}>
+          <div className={styles.quickStatIcon} style={{ background: '#eff6ff', color: '#3b82f6' }}>
+            <FiFlag />
+          </div>
+          <div className={styles.quickStatInfo}>
+            <span className={styles.quickStatValue}>{stats.high}</span>
+            <span className={styles.quickStatLabel}>High Priority</span>
+          </div>
+        </div>
+        <div className={styles.quickStatCard}>
+          <div className={styles.quickStatIcon} style={{ background: '#f0fdf4', color: '#22c55e' }}>
+            <FiActivity />
+          </div>
+          <div className={styles.quickStatInfo}>
+            <span className={styles.quickStatValue}>{stats.review}</span>
+            <span className={styles.quickStatLabel}>In Review</span>
+          </div>
+        </div>
+        <div className={styles.quickStatCard}>
+          <div className={styles.quickStatIcon} style={{ background: '#fefce8', color: '#eab308' }}>
+            <FiFolder />
+          </div>
+          <div className={styles.quickStatInfo}>
+            <span className={styles.quickStatValue}>{Object.keys(stats.projectCounts).length}</span>
+            <span className={styles.quickStatLabel}>Active Projects</span>
+          </div>
+        </div>
+      </div>
+
       {/* Charts Grid */}
       <div className={styles.reportsGrid}>
-        {/* Weekly Activity Chart */}
+        {/* Weekly Activity Chart - Recharts */}
         <div className={styles.reportCard}>
           <div className={styles.reportCardHeader}>
             <h3><FiTrendingUp /> Weekly Activity</h3>
-            <span className={styles.reportBadge}>Tasks Completed</span>
+            <span className={styles.reportBadge}>Last 7 Days</span>
           </div>
-          <div className={styles.barChart}>
-            {weeklyData.map((data, index) => (
-              <div key={index} className={styles.barChartItem}>
-                <div className={styles.barChartBar}>
-                  <div
-                    className={styles.barChartFill}
-                    style={{ height: `${(data.completed / maxCompleted) * 100}%` }}
-                  />
-                </div>
-                <span className={styles.barChartLabel}>{data.day}</span>
-                <span className={styles.barChartValue}>{data.completed}</span>
-              </div>
-            ))}
+          <div className={styles.chartContainer}>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} />
+                <YAxis stroke="var(--text-muted)" fontSize={12} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="created" name="Created" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Task Distribution */}
+        {/* Status Distribution - Pie Chart */}
         <div className={styles.reportCard}>
           <div className={styles.reportCardHeader}>
             <h3><FiBarChart2 /> Task Distribution</h3>
             <span className={styles.reportBadge}>By Status</span>
           </div>
-          <div className={styles.distributionChart}>
-            {columns.filter(c => c.title.toLowerCase() !== 'archive').map(column => {
-              const count = tasks.filter(t => t.column_id === column.id).length
-              const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0
-              return (
-                <div key={column.id} className={styles.distributionItem}>
-                  <div className={styles.distributionInfo}>
-                    <span className={styles.distributionLabel}>{column.title}</span>
-                    <span className={styles.distributionCount}>{count}</span>
-                  </div>
-                  <div className={styles.distributionBar}>
-                    <div
-                      className={styles.distributionFill}
-                      style={{
-                        width: `${percentage}%`,
-                        background: column.color
-                      }}
-                    />
-                  </div>
+          <div className={styles.chartContainer}>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={statusDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {statusDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className={styles.pieLegend}>
+              {statusDistribution.map((entry, index) => (
+                <div key={index} className={styles.pieLegendItem}>
+                  <span className={styles.pieLegendDot} style={{ background: entry.color }} />
+                  <span>{entry.name}</span>
+                  <span className={styles.pieLegendValue}>{entry.value}</span>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Priority Breakdown */}
+        {/* Monthly Trend - Line Chart */}
+        <div className={styles.reportCard}>
+          <div className={styles.reportCardHeader}>
+            <h3><FiActivity /> Monthly Trend</h3>
+            <span className={styles.reportBadge}>Last 6 Months</span>
+          </div>
+          <div className={styles.chartContainer}>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={monthlyTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
+                <YAxis stroke="var(--text-muted)" fontSize={12} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="created"
+                  name="Created"
+                  stroke="#3b82f6"
+                  fill="#3b82f620"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="completed"
+                  name="Completed"
+                  stroke="#22c55e"
+                  fill="#22c55e20"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Priority Breakdown - Pie Chart */}
         <div className={styles.reportCard}>
           <div className={styles.reportCardHeader}>
             <h3><FiTarget /> Priority Breakdown</h3>
             <span className={styles.reportBadge}>By Priority</span>
           </div>
-          <div className={styles.priorityChart}>
-            <div className={styles.priorityVisual}>
-              <svg viewBox="0 0 100 100" className={styles.priorityPie}>
-                {/* High */}
-                <circle
-                  cx="50" cy="50" r="25"
-                  fill="transparent"
-                  stroke="#ef4444"
-                  strokeWidth="50"
-                  strokeDasharray={`${(stats.high / stats.total) * 157} 157`}
-                  transform="rotate(-90 50 50)"
-                />
-                {/* Medium */}
-                <circle
-                  cx="50" cy="50" r="25"
-                  fill="transparent"
-                  stroke="#f59e0b"
-                  strokeWidth="50"
-                  strokeDasharray={`${(stats.medium / stats.total) * 157} 157`}
-                  strokeDashoffset={`${-(stats.high / stats.total) * 157}`}
-                  transform="rotate(-90 50 50)"
-                />
-                {/* Low */}
-                <circle
-                  cx="50" cy="50" r="25"
-                  fill="transparent"
-                  stroke="#10b981"
-                  strokeWidth="50"
-                  strokeDasharray={`${(stats.low / stats.total) * 157} 157`}
-                  strokeDashoffset={`${-((stats.high + stats.medium) / stats.total) * 157}`}
-                  transform="rotate(-90 50 50)"
-                />
-              </svg>
-            </div>
-            <div className={styles.priorityLegend}>
-              <div className={styles.legendItem}>
-                <span className={`${styles.legendDot} ${styles.high}`} />
-                <span className={styles.legendLabel}>High Priority</span>
-                <span className={styles.legendValue}>{stats.high}</span>
-              </div>
-              <div className={styles.legendItem}>
-                <span className={`${styles.legendDot} ${styles.medium}`} />
-                <span className={styles.legendLabel}>Medium Priority</span>
-                <span className={styles.legendValue}>{stats.medium}</span>
-              </div>
-              <div className={styles.legendItem}>
-                <span className={`${styles.legendDot} ${styles.low}`} />
-                <span className={styles.legendLabel}>Low Priority</span>
-                <span className={styles.legendValue}>{stats.low}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Completion Progress */}
-        <div className={styles.reportCard}>
-          <div className={styles.reportCardHeader}>
-            <h3><FiCheckCircle /> Completion Rate</h3>
-            <span className={styles.reportBadge}>Overall</span>
-          </div>
-          <div className={styles.completionChart}>
-            <div className={styles.completionCircle}>
-              <svg viewBox="0 0 100 100">
-                <circle className={styles.completionBg} cx="50" cy="50" r="40" />
-                <circle
-                  className={styles.completionFill}
-                  cx="50" cy="50" r="40"
-                  strokeDasharray={`${stats.completionRate * 2.51} 251`}
-                />
-              </svg>
-              <div className={styles.completionValue}>
-                <span className={styles.completionNumber}>{stats.completionRate}%</span>
-                <span className={styles.completionLabel}>Complete</span>
-              </div>
-            </div>
-            <div className={styles.completionStats}>
-              <div className={styles.completionStat}>
-                <span className={styles.completionStatValue}>{stats.done}</span>
-                <span className={styles.completionStatLabel}>Done</span>
-              </div>
-              <div className={styles.completionStat}>
-                <span className={styles.completionStatValue}>{stats.total - stats.done}</span>
-                <span className={styles.completionStatLabel}>Remaining</span>
-              </div>
+          <div className={styles.chartContainer}>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={priorityData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {priorityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className={styles.pieLegend}>
+              {priorityData.map((entry, index) => (
+                <div key={index} className={styles.pieLegendItem}>
+                  <span className={styles.pieLegendDot} style={{ background: entry.color }} />
+                  <span>{entry.name} Priority</span>
+                  <span className={styles.pieLegendValue}>{entry.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

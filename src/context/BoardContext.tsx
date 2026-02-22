@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react'
 import * as api from '../lib/api'
 import type { BoardState, BoardAction } from '../types'
-import type { Task, TaskInsert } from '../types/database'
+import type { Task, TaskInsert, ColumnUpdate } from '../types/database'
 import { useAuth } from './AuthContext'
 import { useToast } from '../hooks/useToast'
 
@@ -28,6 +28,29 @@ const sendAssignmentNotifications = async (
   }
 }
 
+// Helper to send watcher notifications
+const sendWatcherNotifications = async (
+  taskId: string,
+  taskTitle: string,
+  action: string,
+  watcherIds: string[],
+  performerName: string,
+  boardId: string
+) => {
+  for (const userId of watcherIds) {
+    const { data, error } = await api.createNotification({
+      user_id: userId,
+      type: 'task',
+      title: 'Task Updated',
+      message: `${performerName} ${action} "${taskTitle}"`,
+      is_read: false,
+      task_id: taskId,
+      board_id: boardId
+    })
+    console.log('[Watcher Notification] Result for', userId, ':', { data, error })
+  }
+}
+
 const initialState: BoardState = {
   board: null,
   columns: [],
@@ -39,12 +62,20 @@ const initialState: BoardState = {
   isModalOpen: false,
   modalColumnId: null,
   selectedTaskId: null,
+  selectedTaskIds: [],
+  selectedColumnId: null,
   isDetailPanelOpen: false,
   isStatsPanelOpen: false,
   isShortcutsModalOpen: false,
   isRealtimeConnected: false,
-  viewMode: 'board'
+  viewMode: 'board',
+  history: [],
+  historyIndex: -1,
+  canUndo: false,
+  canRedo: false
 }
+
+const MAX_HISTORY = 50
 
 function boardReducer(state: BoardState, action: BoardAction): BoardState {
   switch (action.type) {
@@ -89,6 +120,40 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       return { ...state, isModalOpen: false, editingTask: null, modalColumnId: null }
     case 'SET_SELECTED_TASK':
       return { ...state, selectedTaskId: action.payload }
+    case 'TOGGLE_SELECTED_TASK':
+      const { taskId, columnId } = action.payload
+      const isCurrentlySelected = state.selectedTaskIds.includes(taskId)
+
+      // If deselecting, just remove from list
+      if (isCurrentlySelected) {
+        const newSelectedIds = state.selectedTaskIds.filter(id => id !== taskId)
+        // If no more selected, clear column too
+        return {
+          ...state,
+          selectedTaskIds: newSelectedIds,
+          selectedColumnId: newSelectedIds.length === 0 ? null : state.selectedColumnId
+        }
+      }
+
+      // If selecting new task from different column, clear previous selection
+      if (state.selectedColumnId && state.selectedColumnId !== columnId) {
+        return {
+          ...state,
+          selectedTaskIds: [taskId],
+          selectedColumnId: columnId
+        }
+      }
+
+      // Same column or first selection
+      return {
+        ...state,
+        selectedTaskIds: [...state.selectedTaskIds, taskId],
+        selectedColumnId: state.selectedColumnId || columnId
+      }
+    case 'SET_SELECTED_TASKS':
+      return { ...state, selectedTaskIds: action.payload }
+    case 'CLEAR_SELECTED_TASKS':
+      return { ...state, selectedTaskIds: [], selectedColumnId: null }
     case 'OPEN_DETAIL_PANEL':
       return { ...state, isDetailPanelOpen: true, selectedTaskId: action.payload }
     case 'CLOSE_DETAIL_PANEL':
@@ -101,6 +166,65 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
       return { ...state, isRealtimeConnected: action.payload }
     case 'SET_VIEW_MODE':
       return { ...state, viewMode: action.payload }
+    case 'UPDATE_COLUMN':
+      return {
+        ...state,
+        columns: state.columns.map(c => c.id === action.payload.id ? action.payload : c)
+      }
+    case 'SOFT_DELETE_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map(t =>
+          t.id === action.payload.taskId
+            ? { ...t, deleted_at: new Date().toISOString(), deleted_by: action.payload.deletedBy }
+            : t
+        )
+      }
+    case 'RESTORE_TASK':
+      return {
+        ...state,
+        tasks: state.tasks.map(t =>
+          t.id === action.payload
+            ? { ...t, deleted_at: null, deleted_by: null }
+            : t
+        )
+      }
+    case 'PUSH_HISTORY': {
+      const newHistory = state.history.slice(0, state.historyIndex + 1)
+      newHistory.push(action.payload)
+      if (newHistory.length > MAX_HISTORY) {
+        newHistory.shift()
+      }
+      return {
+        ...state,
+        history: newHistory,
+        historyIndex: newHistory.length - 1,
+        canUndo: newHistory.length > 1,
+        canRedo: false
+      }
+    }
+    case 'UNDO': {
+      if (state.historyIndex <= 0) return state
+      const newIndex = state.historyIndex - 1
+      return {
+        ...state,
+        tasks: state.history[newIndex] || [],
+        historyIndex: newIndex,
+        canUndo: newIndex > 0,
+        canRedo: true
+      }
+    }
+    case 'REDO': {
+      if (state.historyIndex >= state.history.length - 1) return state
+      const newIndex = state.historyIndex + 1
+      return {
+        ...state,
+        tasks: state.history[newIndex] || [],
+        historyIndex: newIndex,
+        canUndo: true,
+        canRedo: newIndex < state.history.length - 1
+      }
+    }
     default:
       return state
   }
@@ -113,19 +237,32 @@ interface BoardContextType {
   openModal: (columnId?: string) => void
   closeModal: () => void
   openEditModal: (task: Task) => void
-  saveTask: (task: Partial<Task>, tags: string[], subtasks: { id?: string; title: string; is_completed?: boolean }[], labelIds?: string[], projectId?: string | null, assigneeIds?: string[]) => Promise<void>
+  saveTask: (task: Partial<Task>, tags: string[], subtasks: { id?: string; title: string; is_completed?: boolean }[], labelIds?: string[], projectId?: string | null, assigneeIds?: string[]) => Promise<string | null>
   deleteTask: (taskId: string) => Promise<void>
-  moveTask: (taskId: string, columnId: string, position: number) => Promise<void>
+  softDeleteTask: (taskId: string) => Promise<void>
+  restoreTask: (taskId: string) => Promise<void>
+  permanentDeleteTask: (taskId: string) => Promise<void>
+  duplicateTask: (taskId: string) => Promise<string | null>
+  moveTask: (taskId: string, columnId: string, position: number) => Promise<boolean>
   archiveTask: (task: Task) => Promise<void>
-  restoreTask: (task: Task) => Promise<void>
+  unarchiveTask: (task: Task) => Promise<void>
   setSearchQuery: (query: string) => void
   selectTask: (taskId: string | null) => void
+  toggleSelectedTask: (taskId: string, columnId: string) => void
+  clearSelectedTasks: () => void
+  bulkDeleteTasks: () => Promise<void>
+  bulkMoveTasks: (columnId: string) => Promise<void>
+  bulkUpdatePriority: (priority: 'low' | 'medium' | 'high') => Promise<void>
   openDetailPanel: (taskId: string) => void
   closeDetailPanel: () => void
   toggleStatsPanel: () => void
   toggleShortcutsModal: () => void
-  exportData: () => void
-  setViewMode: (mode: 'board' | 'list') => void
+  exportData: (format?: 'json' | 'csv') => void
+  setViewMode: (mode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash') => void
+  updateColumn: (columnId: string, updates: ColumnUpdate) => Promise<void>
+  checkWipLimit: (columnId: string) => { atLimit: boolean; current: number; limit: number | null }
+  undo: () => void
+  redo: () => void
 }
 
 const BoardContext = createContext<BoardContextType | undefined>(undefined)
@@ -140,6 +277,24 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     if (!user) {
       console.log('[loadBoard] No user, skipping')
       return
+    }
+
+    // Ensure profile exists first
+    console.log('[loadBoard] Ensuring profile exists for user:', user.id)
+    const { data: existingProfile, error: profileError } = await api.getProfile(user.id)
+
+    if (profileError || !existingProfile) {
+      console.log('[loadBoard] Creating profile...')
+      const { error: createProfileError } = await api.createProfile(
+        user.id,
+        user.email || '',
+        user.user_metadata?.full_name
+      )
+      if (createProfileError) {
+        console.error('[loadBoard] Failed to create profile:', createProfileError)
+      } else {
+        console.log('[loadBoard] Profile created successfully')
+      }
     }
 
     console.log('[loadBoard] Starting for user:', user.id)
@@ -313,7 +468,9 @@ export function BoardProvider({ children }: { children: ReactNode }) {
 
       console.log('[loadTasks] ============ END DEBUG ============')
 
-      dispatch({ type: 'SET_TASKS', payload: allTasks })
+      // Filter out soft-deleted tasks for main view
+      const activeTasks = allTasks.filter(t => !t.deleted_at)
+      dispatch({ type: 'SET_TASKS', payload: activeTasks })
     } catch (error: any) {
       console.error('[loadTasks] Error:', error)
       showToast('Failed to load tasks', 'error')
@@ -380,17 +537,17 @@ export function BoardProvider({ children }: { children: ReactNode }) {
         if (!state.modalColumnId) {
           console.error('[saveTask] No modalColumnId!')
           showToast('No column selected', 'error')
-          return
+          return null
         }
         if (!state.board?.id) {
           console.error('[saveTask] No board!')
           showToast('Board not loaded', 'error')
-          return
+          return null
         }
         if (!user?.id) {
           console.error('[saveTask] No user!')
           showToast('User not authenticated', 'error')
-          return
+          return null
         }
       }
 
@@ -509,7 +666,54 @@ export function BoardProvider({ children }: { children: ReactNode }) {
   }, [state.editingTask, state.modalColumnId, state.board, state.tasks, user, profile, loadTasks, closeModal, showToast])
 
   const deleteTask = useCallback(async (taskId: string) => {
-    if (!confirm('Are you sure you want to delete this task?')) return
+    // Now uses soft delete by default
+    await softDeleteTask(taskId)
+  }, [showToast])
+
+  const softDeleteTask = useCallback(async (taskId: string) => {
+    if (!user) return
+
+    try {
+      // Save current state to history before delete
+      dispatch({ type: 'PUSH_HISTORY', payload: state.tasks })
+
+      // Soft delete in database
+      const { error } = await api.updateTask(taskId, {
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.id
+      })
+
+      if (error) throw error
+
+      dispatch({ type: 'SOFT_DELETE_TASK', payload: { taskId, deletedBy: user.id } })
+      dispatch({ type: 'SET_SELECTED_TASK', payload: null })
+      dispatch({ type: 'CLEAR_SELECTED_TASKS' })
+      showToast('Task moved to trash (Ctrl+Z to undo)', 'info')
+    } catch (error: any) {
+      console.error('Soft delete task error:', error)
+      showToast('Failed to delete task', 'error')
+    }
+  }, [user, state.tasks, showToast])
+
+  const restoreTask = useCallback(async (taskId: string) => {
+    try {
+      const { error } = await api.updateTask(taskId, {
+        deleted_at: null,
+        deleted_by: null
+      })
+
+      if (error) throw error
+
+      dispatch({ type: 'RESTORE_TASK', payload: taskId })
+      showToast('Task restored', 'success')
+    } catch (error: any) {
+      console.error('Restore task error:', error)
+      showToast('Failed to restore task', 'error')
+    }
+  }, [showToast])
+
+  const permanentDeleteTask = useCallback(async (taskId: string) => {
+    if (!confirm('Permanently delete this task? This cannot be undone.')) return
 
     try {
       const { error } = await api.deleteTask(taskId)
@@ -517,27 +721,69 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       if (error) throw error
 
       dispatch({ type: 'DELETE_TASK', payload: taskId })
-      dispatch({ type: 'SET_SELECTED_TASK', payload: null })
-      showToast('Task deleted', 'info')
+      showToast('Task permanently deleted', 'info')
     } catch (error: any) {
-      console.error('Delete task error:', error)
+      console.error('Permanent delete task error:', error)
       showToast('Failed to delete task', 'error')
     }
   }, [showToast])
 
-  const moveTask = useCallback(async (taskId: string, columnId: string, position: number) => {
+  const duplicateTask = useCallback(async (taskId: string): Promise<string | null> => {
+    if (!user) return null
+
+    try {
+      const { data, error } = await api.duplicateTask(taskId, user.id)
+
+      if (error) throw error
+
+      await loadTasks()
+      showToast('Task duplicated!', 'success')
+      return data?.id || null
+    } catch (error: any) {
+      console.error('Duplicate task error:', error)
+      showToast('Failed to duplicate task', 'error')
+      return null
+    }
+  }, [user, loadTasks, showToast])
+
+  const undo = useCallback(() => {
+    dispatch({ type: 'UNDO' })
+    showToast('Undo successful', 'info')
+  }, [showToast])
+
+  const redo = useCallback(() => {
+    dispatch({ type: 'REDO' })
+    showToast('Redo successful', 'info')
+  }, [showToast])
+
+  const moveTask = useCallback(async (taskId: string, columnId: string, position: number): Promise<boolean> => {
+    // Check WIP limit for target column
+    const targetColumn = state.columns.find(c => c.id === columnId)
+    if (targetColumn?.wip_limit) {
+      const currentTasks = state.tasks.filter(t => t.column_id === columnId && !t.is_archived)
+      const taskToMove = state.tasks.find(t => t.id === taskId)
+
+      // Only check limit if moving TO the column (not within the same column)
+      if (taskToMove && taskToMove.column_id !== columnId && currentTasks.length >= targetColumn.wip_limit) {
+        showToast(`Cannot move task: Column "${targetColumn.title}" has reached its WIP limit of ${targetColumn.wip_limit}`, 'warning')
+        return false
+      }
+    }
+
     try {
       const { error } = await api.updateTask(taskId, { column_id: columnId, position })
 
       if (error) throw error
 
       dispatch({ type: 'MOVE_TASK', payload: { taskId, columnId, position } })
+      return true
     } catch (error: any) {
       console.error('Move task error:', error)
       showToast('Failed to move task', 'error')
       await loadTasks() // Revert
+      return false
     }
-  }, [loadTasks, showToast])
+  }, [state.columns, state.tasks, loadTasks, showToast])
 
   const archiveTask = useCallback(async (task: Task) => {
     const archiveColumn = state.columns.find(c => c.title.toLowerCase() === 'archive')
@@ -559,7 +805,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     }
   }, [state.columns, loadTasks, showToast])
 
-  const restoreTask = useCallback(async (task: Task) => {
+  const unarchiveTask = useCallback(async (task: Task) => {
     const todoColumn = state.columns.find(c => c.title.toLowerCase() === 'to do')
     if (!todoColumn) return
 
@@ -572,10 +818,10 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       if (error) throw error
 
       await loadTasks()
-      showToast('Task restored', 'success')
+      showToast('Task unarchived', 'success')
     } catch (error: any) {
-      console.error('Restore task error:', error)
-      showToast('Failed to restore task', 'error')
+      console.error('Unarchive task error:', error)
+      showToast('Failed to unarchive task', 'error')
     }
   }, [state.columns, loadTasks, showToast])
 
@@ -609,9 +855,113 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     showToast('Data exported!', 'success')
   }, [state.board, state.columns, state.tasks, showToast])
 
-  const setViewMode = useCallback((mode: 'board' | 'list') => {
+  const setViewMode = useCallback((mode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash') => {
     dispatch({ type: 'SET_VIEW_MODE', payload: mode })
   }, [])
+
+  const toggleSelectedTask = useCallback((taskId: string, columnId: string) => {
+    dispatch({ type: 'TOGGLE_SELECTED_TASK', payload: { taskId, columnId } })
+  }, [])
+
+  const clearSelectedTasks = useCallback(() => {
+    dispatch({ type: 'CLEAR_SELECTED_TASKS' })
+  }, [])
+
+  const bulkDeleteTasks = useCallback(async () => {
+    if (state.selectedTaskIds.length === 0) return
+
+    if (!confirm(`Are you sure you want to delete ${state.selectedTaskIds.length} tasks?`)) return
+
+    try {
+      const { error } = await api.bulkDeleteTasks(state.selectedTaskIds)
+      if (error) throw error
+
+      dispatch({ type: 'CLEAR_SELECTED_TASKS' })
+      await loadTasks()
+      showToast(`${state.selectedTaskIds.length} tasks deleted`, 'info')
+    } catch (error: any) {
+      console.error('Bulk delete error:', error)
+      showToast('Failed to delete tasks', 'error')
+    }
+  }, [state.selectedTaskIds, loadTasks, showToast])
+
+  const bulkMoveTasks = useCallback(async (columnId: string) => {
+    if (state.selectedTaskIds.length === 0) return
+
+    // Check WIP limit
+    const targetColumn = state.columns.find(c => c.id === columnId)
+    if (targetColumn?.wip_limit) {
+      const currentTasks = state.tasks.filter(t => t.column_id === columnId && !t.is_archived)
+      const tasksToMove = state.tasks.filter(t => state.selectedTaskIds.includes(t.id) && t.column_id !== columnId)
+
+      if (currentTasks.length + tasksToMove.length > targetColumn.wip_limit) {
+        showToast(`Cannot move tasks: Column "${targetColumn.title}" would exceed its WIP limit of ${targetColumn.wip_limit}`, 'warning')
+        return
+      }
+    }
+
+    try {
+      const { error } = await api.bulkMoveTasks(state.selectedTaskIds, columnId)
+      if (error) throw error
+
+      dispatch({ type: 'CLEAR_SELECTED_TASKS' })
+      await loadTasks()
+      showToast(`${state.selectedTaskIds.length} tasks moved`, 'success')
+    } catch (error: any) {
+      console.error('Bulk move error:', error)
+      showToast('Failed to move tasks', 'error')
+    }
+  }, [state.selectedTaskIds, state.columns, state.tasks, loadTasks, showToast])
+
+  const bulkUpdatePriority = useCallback(async (priority: 'low' | 'medium' | 'high') => {
+    if (state.selectedTaskIds.length === 0) return
+
+    try {
+      const { error } = await api.bulkUpdateTasks(state.selectedTaskIds, { priority })
+      if (error) throw error
+
+      await loadTasks()
+      showToast(`${state.selectedTaskIds.length} tasks updated to ${priority} priority`, 'success')
+    } catch (error: any) {
+      console.error('Bulk update error:', error)
+      showToast('Failed to update tasks', 'error')
+    }
+  }, [state.selectedTaskIds, loadTasks, showToast])
+
+  const updateColumn = useCallback(async (columnId: string, updates: ColumnUpdate) => {
+    try {
+      const { data, error } = await api.updateColumn(columnId, updates)
+      if (error) throw error
+
+      dispatch({ type: 'UPDATE_COLUMN', payload: data })
+      showToast('Column updated', 'success')
+    } catch (error: any) {
+      console.error('Update column error:', error)
+      showToast('Failed to update column', 'error')
+    }
+  }, [showToast])
+
+  const checkWipLimit = useCallback((columnId: string) => {
+    const column = state.columns.find(c => c.id === columnId)
+    const currentCount = state.tasks.filter(t => t.column_id === columnId && !t.is_archived).length
+
+    return {
+      atLimit: column?.wip_limit ? currentCount >= column.wip_limit : false,
+      current: currentCount,
+      limit: column?.wip_limit || null
+    }
+  }, [state.columns, state.tasks])
+
+  const exportDataEnhanced = useCallback((format: 'json' | 'csv' = 'json') => {
+    if (!state.board || !state.columns || !state.tasks) return
+
+    if (format === 'csv') {
+      api.exportToCSV(state.board, state.columns, state.tasks)
+    } else {
+      api.exportData(state.board, state.columns, state.tasks)
+    }
+    showToast(`Data exported as ${format.toUpperCase()}!`, 'success')
+  }, [state.board, state.columns, state.tasks, showToast])
 
   return (
     <BoardContext.Provider value={{
@@ -623,17 +973,30 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       openEditModal,
       saveTask,
       deleteTask,
+      softDeleteTask,
+      restoreTask,
+      permanentDeleteTask,
+      duplicateTask,
       moveTask,
       archiveTask,
-      restoreTask,
+      unarchiveTask,
       setSearchQuery,
       selectTask,
+      toggleSelectedTask,
+      clearSelectedTasks,
+      bulkDeleteTasks,
+      bulkMoveTasks,
+      bulkUpdatePriority,
       openDetailPanel,
       closeDetailPanel,
       toggleStatsPanel,
       toggleShortcutsModal,
-      exportData,
-      setViewMode
+      exportData: exportDataEnhanced,
+      setViewMode,
+      updateColumn,
+      checkWipLimit,
+      undo,
+      redo
     }}>
       {children}
     </BoardContext.Provider>

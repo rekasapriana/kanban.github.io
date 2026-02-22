@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FiPlus, FiMail, FiShield, FiEdit2, FiTrash2, FiX, FiUsers, FiUserCheck, FiUser, FiSearch, FiCheck, FiAlertCircle, FiClock, FiSend } from 'react-icons/fi'
+import { FiPlus, FiMail, FiShield, FiEdit2, FiTrash2, FiX, FiUsers, FiUserCheck, FiUser, FiSearch, FiCheck, FiAlertCircle, FiClock, FiSend, FiFolder, FiFolderPlus } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
-import { getTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember, getProfileByEmail, getSentInvitations, createTeamInvitation, cancelTeamInvitation } from '../../lib/api'
-import type { TeamMember, TeamInvitation } from '../../types/database'
+import { getTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember, getProfileByEmail, getSentInvitations, createTeamInvitation, cancelTeamInvitation, getProjects, createProject } from '../../lib/api'
+import type { TeamMember, TeamInvitation, Project } from '../../types/database'
 import styles from './Views.module.css'
 
 export default function TeamView() {
@@ -11,16 +11,21 @@ export default function TeamView() {
   const { showToast } = useToast()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invitations, setInvitations] = useState<TeamInvitation[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'admin' | 'member' | 'viewer' | 'pending'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [showProjectModal, setShowProjectModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'member' as 'admin' | 'member' | 'viewer'
+    role: 'member' as 'admin' | 'member' | 'viewer',
+    project_id: '' as string
   })
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectColor, setNewProjectColor] = useState('#3b82f6')
 
   const loadTeamMembers = useCallback(async (userId: string) => {
     console.log('[TeamView] Loading team members for user:', userId)
@@ -35,6 +40,12 @@ export default function TeamView() {
     const { data: invitationsData } = await getSentInvitations(userId)
     if (invitationsData) {
       setInvitations(invitationsData.filter(i => i.status === 'pending'))
+    }
+
+    // Load projects
+    const { data: projectsData } = await getProjects(userId)
+    if (projectsData) {
+      setProjects(projectsData)
     }
 
     if (!error && data) {
@@ -91,7 +102,7 @@ export default function TeamView() {
 
   const openCreateModal = () => {
     setEditingMember(null)
-    setFormData({ name: '', email: '', role: 'member' })
+    setFormData({ name: '', email: '', role: 'member', project_id: '' })
     setShowModal(true)
   }
 
@@ -100,14 +111,43 @@ export default function TeamView() {
     setFormData({
       name: member.name,
       email: member.email,
-      role: member.role
+      role: member.role,
+      project_id: ''
     })
     setShowModal(true)
+  }
+
+  const handleCreateProject = async () => {
+    if (!user || !newProjectName.trim()) return
+
+    const { data, error } = await createProject({
+      user_id: user.id,
+      name: newProjectName.trim(),
+      color: newProjectColor,
+      description: null,
+      is_starred: false
+    })
+
+    if (!error && data) {
+      setProjects([...projects, data])
+      setFormData({ ...formData, project_id: data.id })
+      setNewProjectName('')
+      setShowProjectModal(false)
+      showToast('Project created!', 'success')
+    } else {
+      showToast('Failed to create project', 'error')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !formData.name.trim() || !formData.email.trim()) return
+
+    // Check if project is selected for new invitations
+    if (!editingMember && !formData.project_id) {
+      showToast('Please select a project first', 'error')
+      return
+    }
 
     if (editingMember) {
       // Update existing member
@@ -121,12 +161,13 @@ export default function TeamView() {
         showToast('Member updated!', 'success')
       }
     } else {
-      // Create invitation (not directly adding member)
+      // Create invitation with project_id
       const { data, error } = await createTeamInvitation({
         team_owner_id: user.id,
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        role: formData.role
+        role: formData.role,
+        project_id: formData.project_id
       })
 
       if (!error && data) {
@@ -415,17 +456,57 @@ export default function TeamView() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Invite Modal */}
       {showModal && (
         <div className={styles.modal} onClick={() => setShowModal(false)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2>{editingMember ? 'Edit Member' : 'Invite Member'}</h2>
+              <h2>{editingMember ? 'Edit Member' : 'Invite to Project'}</h2>
               <button className={styles.closeBtn} onClick={() => setShowModal(false)}>
                 <FiX />
               </button>
             </div>
             <form onSubmit={handleSubmit}>
+              {/* Project Selection - Only for new invitations */}
+              {!editingMember && (
+                <div className={styles.formGroup}>
+                  <label>
+                    <FiFolder /> Select Project <span style={{color: 'red'}}>*</span>
+                  </label>
+                  {projects.length === 0 ? (
+                    <div className={styles.noProjectsWarning}>
+                      <FiAlertCircle />
+                      <span>No projects available. </span>
+                      <button type="button" onClick={() => setShowProjectModal(true)} className={styles.createProjectLink}>
+                        Create a project first
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={formData.project_id}
+                        onChange={e => setFormData({ ...formData, project_id: e.target.value })}
+                        className={!formData.project_id ? styles.selectPlaceholder : ''}
+                      >
+                        <option value="">-- Select Project --</option>
+                        {projects.map(project => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className={styles.addProjectBtn}
+                        onClick={() => setShowProjectModal(true)}
+                      >
+                        <FiFolderPlus /> Create New Project
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className={styles.formGroup}>
                 <label>Name</label>
                 <input
@@ -433,7 +514,7 @@ export default function TeamView() {
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Enter member name"
-                  autoFocus
+                  autoFocus={editingMember ? true : false}
                 />
               </div>
               <div className={styles.formGroup}>
@@ -460,8 +541,60 @@ export default function TeamView() {
                 <button type="button" className={styles.secondaryBtn} onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className={styles.primaryBtn}>
+                <button
+                  type="submit"
+                  className={styles.primaryBtn}
+                  disabled={!editingMember && !formData.project_id}
+                >
                   {editingMember ? 'Save Changes' : 'Send Invite'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Project Modal */}
+      {showProjectModal && (
+        <div className={styles.modal} onClick={() => setShowProjectModal(false)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2><FiFolderPlus /> Create New Project</h2>
+              <button className={styles.closeBtn} onClick={() => setShowProjectModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateProject(); }}>
+              <div className={styles.formGroup}>
+                <label>Project Name</label>
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={e => setNewProjectName(e.target.value)}
+                  placeholder="e.g., Website Redesign"
+                  autoFocus
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Color</label>
+                <div className={styles.colorPicker}>
+                  {['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280'].map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`${styles.colorOption} ${newProjectColor === color ? styles.colorSelected : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setNewProjectColor(color)}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.secondaryBtn} onClick={() => setShowProjectModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className={styles.primaryBtn} disabled={!newProjectName.trim()}>
+                  Create Project
                 </button>
               </div>
             </form>

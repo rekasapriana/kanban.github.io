@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
-import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag, FiPaperclip, FiDownload, FiFile, FiAtSign, FiCornerDownLeft, FiCopy, FiStar, FiAward, FiSmile } from 'react-icons/fi'
+import { FiX, FiEdit2, FiTrash2, FiMessageCircle, FiImage, FiSend, FiFlag, FiCalendar, FiCheckSquare, FiTag, FiPaperclip, FiDownload, FiFile, FiAtSign, FiCornerDownLeft, FiCopy, FiStar, FiAward, FiSmile, FiEye, FiEyeOff, FiUpload, FiActivity, FiList } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../hooks/useToast'
-import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, getTaskAttachments, deleteTaskAttachment, updateSubtask, getProfile, createNotification, getTeamMembers } from '../../lib/api'
-import type { TaskComment, Profile, TaskAttachment, TeamMember } from '../../types/database'
+import { getTaskComments, createTaskComment, deleteTaskComment, uploadTaskAttachment, getTaskAttachments, deleteTaskAttachment, updateSubtask, getProfile, createNotification, getTeamMembers, toggleTaskWatcher, isTaskWatched, updateTask } from '../../lib/api'
+import { supabase } from '../../lib/supabase'
+import type { TaskComment, Profile, TaskAttachment, TeamMember, CustomField } from '../../types/database'
 import TimeTracker from './TimeTracker'
 import TaskDependencies from './TaskDependencies'
+import ActivityHistory from './ActivityHistory'
 import styles from './TaskDetailPanel.module.css'
 
 interface MentionableUser {
@@ -19,7 +21,7 @@ interface MentionableUser {
 const EMOJIS = ['👍', '👎', '😊', '😂', '❤️', '🔥', '🎉', '👀', '🙏', '💪', '✅', '❌', '⭐', '💡', '🚀', '👋', '🤔', '😅', '🙌', '💯', '📌', '⚡', '🎯', '📝']
 
 export default function TaskDetailPanel() {
-  const { state, deleteTask, archiveTask, openEditModal, closeDetailPanel, loadTasks } = useBoard()
+  const { state, deleteTask, archiveTask, openEditModal, closeDetailPanel, loadTasks, duplicateTask } = useBoard()
   const { user, profile } = useAuth()
   const { showToast } = useToast()
   const [comments, setComments] = useState<TaskComment[]>([])
@@ -41,6 +43,9 @@ export default function TaskDetailPanel() {
   const [pinnedComments, setPinnedComments] = useState<Set<string>>(new Set())
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState<string | null>(null) // commentId
+  const [isWatching, setIsWatching] = useState(false)
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +55,60 @@ export default function TaskDetailPanel() {
 
   // Check if user is the owner of the task (full access) or just assigned (limited access)
   const isTaskOwner = user?.id === task?.user_id
+
+  // Load watching status
+  useEffect(() => {
+    const checkWatchingStatus = async () => {
+      if (task && user) {
+        const { isWatched } = await isTaskWatched(task.id, user.id)
+        setIsWatching(isWatched)
+      }
+    }
+    checkWatchingStatus()
+  }, [task?.id, user?.id])
+
+  // Load custom fields and values
+  useEffect(() => {
+    const loadCustomFields = async () => {
+      if (!task || !state.board?.id) {
+        setCustomFields([])
+        setCustomFieldValues({})
+        return
+      }
+
+      console.log('[TaskDetail] Loading custom fields for board:', state.board.id)
+
+      // Load custom field definitions
+      const { data: fieldsData, error: fieldsError } = await supabase
+        .from('custom_fields')
+        .select('*')
+        .eq('board_id', state.board.id)
+        .order('position', { ascending: true })
+
+      console.log('[TaskDetail] Custom fields:', fieldsData, 'error:', fieldsError)
+
+      if (fieldsData) {
+        setCustomFields(fieldsData)
+
+        // Load values for this task
+        const { data: valuesData, error: valuesError } = await supabase
+          .from('custom_field_values')
+          .select('*')
+          .eq('task_id', task.id)
+
+        console.log('[TaskDetail] Custom field values:', valuesData, 'error:', valuesError)
+
+        if (valuesData) {
+          const values: Record<string, any> = {}
+          valuesData.forEach(v => {
+            values[v.field_id] = v.value?.value
+          })
+          setCustomFieldValues(values)
+        }
+      }
+    }
+    loadCustomFields()
+  }, [task?.id, state.board?.id])
 
   // Load comments
   useEffect(() => {
@@ -622,7 +681,7 @@ export default function TaskDetailPanel() {
       user_id: user.id,
       content: commentInput.trim() || (uploadedUrls.length > 0 ? '📎 Shared file(s)' : ''),
       image_url: uploadedUrls[0] || null,
-      parent_id: replyingTo?.id || null,
+      parent_id: null,
       is_pinned: false
     })
 
@@ -632,11 +691,10 @@ export default function TaskDetailPanel() {
       setCommentFiles([])
       setCommentFilePreviews([])
       setShowMentionList(false)
-      setReplyingTo(null)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
-      showToast(replyingTo ? 'Reply sent!' : 'Comment added!', 'success')
+      showToast('Comment added!', 'success')
 
       // Send notifications to task owner, assignees, and mentioned users (except commenter)
       const commenterName = profile?.full_name || user?.email?.split('@')[0] || 'Someone'
@@ -719,10 +777,31 @@ export default function TaskDetailPanel() {
     closeDetailPanel()
   }
 
+  const handleDuplicateTask = async () => {
+    if (!task) return
+    const newTaskId = await duplicateTask(task.id)
+    if (newTaskId) {
+      showToast('Task duplicated successfully', 'success')
+    }
+  }
+
   const handleEdit = () => {
     if (task) {
       closeDetailPanel()
       openEditModal(task)
+    }
+  }
+
+  const handleToggleWatch = async () => {
+    if (!task || !user) return
+
+    const { watching, error } = await toggleTaskWatcher(task.id, user.id)
+
+    if (!error) {
+      setIsWatching(watching)
+      showToast(watching ? 'You are now watching this task' : 'You stopped watching this task', 'info')
+    } else {
+      showToast('Failed to update watch status', 'error')
     }
   }
 
@@ -859,6 +938,33 @@ export default function TaskDetailPanel() {
 
   const displayName = profile?.full_name || user?.user_metadata?.name || 'You'
 
+  // Helper to render custom field value
+  const renderCustomFieldValue = (field: CustomField, value: any) => {
+    switch (field.field_type) {
+      case 'select':
+        const option = field.options?.find(o => o.value === value)
+        return option?.label || value
+      case 'multiselect':
+        if (Array.isArray(value)) {
+          return value.map(v => {
+            const opt = field.options?.find(o => o.value === v)
+            return opt?.label || v
+          }).join(', ')
+        }
+        return value
+      case 'checkbox':
+        return value ? '✓ Yes' : '✗ No'
+      case 'url':
+        return (
+          <a href={value} target="_blank" rel="noopener noreferrer" className={styles.linkValue}>
+            {value}
+          </a>
+        )
+      default:
+        return String(value)
+    }
+  }
+
   if (!state.isDetailPanelOpen || !task) return null
 
   return (
@@ -871,10 +977,107 @@ export default function TaskDetailPanel() {
         {/* Header */}
         <div className={styles.header}>
           <h2>{task.title}</h2>
-          <button className={styles.closeBtn} onClick={closeDetailPanel}>
-            <FiX />
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={`${styles.watchBtn} ${isWatching ? styles.watching : ''}`}
+              onClick={handleToggleWatch}
+              title={isWatching ? 'Stop watching this task' : 'Watch this task for updates'}
+            >
+              {isWatching ? <FiEyeOff /> : <FiEye />}
+              {isWatching ? 'Watching' : 'Watch'}
+            </button>
+            <button className={styles.closeBtn} onClick={closeDetailPanel}>
+              <FiX />
+            </button>
+          </div>
         </div>
+
+        {/* Cover Image */}
+        {isTaskOwner && (
+          <div className={styles.coverSection}>
+            {task.cover_image_url ? (
+              <div className={styles.coverImageWrapper}>
+                <img src={task.cover_image_url} alt="Cover" className={styles.coverImage} />
+                <div className={styles.coverActions}>
+                  <button
+                    className={styles.coverActionBtn}
+                    onClick={async () => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0]
+                        if (!file || !user) return
+
+                        // Upload to Supabase storage
+                        const fileName = `${user.id}/${task.id}/cover-${Date.now()}.${file.name.split('.').pop()}`
+                        const { supabase } = await import('../../lib/supabase')
+                        const { error: uploadError } = await supabase.storage
+                          .from('attachments')
+                          .upload(fileName, file, { upsert: true })
+
+                        if (uploadError) {
+                          showToast('Failed to upload cover image', 'error')
+                          return
+                        }
+
+                        const { data } = supabase.storage.from('attachments').getPublicUrl(fileName)
+                        await updateTask(task.id, { cover_image_url: data.publicUrl })
+                        await loadTasks()
+                        showToast('Cover image updated!', 'success')
+                      }
+                      input.click()
+                    }}
+                  >
+                    <FiUpload /> Change
+                  </button>
+                  <button
+                    className={`${styles.coverActionBtn} ${styles.removeCoverBtn}`}
+                    onClick={async () => {
+                      await updateTask(task.id, { cover_image_url: null })
+                      await loadTasks()
+                      showToast('Cover image removed', 'info')
+                    }}
+                  >
+                    <FiTrash2 /> Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className={styles.addCoverBtn}
+                onClick={async () => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = 'image/*'
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0]
+                    if (!file || !user) return
+
+                    const fileName = `${user.id}/${task.id}/cover-${Date.now()}.${file.name.split('.').pop()}`
+                    const { supabase } = await import('../../lib/supabase')
+                    const { error: uploadError } = await supabase.storage
+                      .from('attachments')
+                      .upload(fileName, file)
+
+                    if (uploadError) {
+                      showToast('Failed to upload cover image', 'error')
+                      return
+                    }
+
+                    const { data } = supabase.storage.from('attachments').getPublicUrl(fileName)
+                    await updateTask(task.id, { cover_image_url: data.publicUrl })
+                    await loadTasks()
+                    showToast('Cover image added!', 'success')
+                  }
+                  input.click()
+                }}
+              >
+                <FiImage /> Add Cover Image
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className={styles.content}>
@@ -905,6 +1108,31 @@ export default function TaskDetailPanel() {
           {task.description && (
             <div className={styles.section}>
               <p className={styles.description}>{task.description}</p>
+            </div>
+          )}
+
+          {/* Custom Fields */}
+          {customFields.length > 0 && Object.keys(customFieldValues).length > 0 && (
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <FiList />
+                <span>Custom Fields</span>
+              </div>
+              <div className={styles.customFieldsGrid}>
+                {customFields.map(field => {
+                  const value = customFieldValues[field.id]
+                  if (value === undefined || value === null || value === '') return null
+
+                  return (
+                    <div key={field.id} className={styles.customFieldItem}>
+                      <span className={styles.customFieldLabel}>{field.name}</span>
+                      <span className={styles.customFieldValue}>
+                        {renderCustomFieldValue(field, value)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -965,6 +1193,15 @@ export default function TaskDetailPanel() {
               taskId={task.id}
               boardId={task.board_id}
             />
+          </div>
+
+          {/* Activity History */}
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <FiActivity />
+              <span>Activity</span>
+            </div>
+            <ActivityHistory taskId={task.id} limit={10} />
           </div>
 
           {/* Attachments Section */}
@@ -1346,6 +1583,10 @@ export default function TaskDetailPanel() {
             <button className={styles.menuBtn} onClick={handleEdit} title="Edit Task">
               <FiEdit2 />
               <span>Edit</span>
+            </button>
+            <button className={styles.menuBtn} onClick={handleDuplicateTask} title="Duplicate">
+              <FiCopy />
+              <span>Duplicate</span>
             </button>
             <button className={styles.menuBtn} onClick={handleArchiveTask} title="Archive">
               <FiTrash2 />

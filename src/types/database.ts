@@ -23,8 +23,11 @@ export interface Column {
   title: string
   color: string
   position: number
+  wip_limit: number | null
   created_at: string
 }
+
+export type ColumnUpdate = Partial<Pick<Column, 'title' | 'color' | 'position' | 'wip_limit'>>
 
 export interface Tag {
   id: string
@@ -57,6 +60,10 @@ export interface Task {
   assignee_id?: string | null
   timer_started_at?: string | null
   timer_user_id?: string | null
+  reminder_at?: string | null
+  cover_image_url?: string | null
+  deleted_at?: string | null
+  deleted_by?: string | null
   created_at: string
   updated_at: string
   tags: Tag[]
@@ -68,6 +75,8 @@ export interface Task {
   time_entries?: TimeEntry[]
   dependencies?: TaskDependency[]
   recurring_pattern?: RecurringPattern | null
+  watchers?: TaskWatcherWithProfile[]
+  custom_field_values?: CustomFieldValue[]
 }
 
 // ==================== TASK ASSIGNEES ====================
@@ -85,7 +94,7 @@ export interface TaskAssigneeWithProfile extends TaskAssignee {
 }
 
 export type TaskInsert = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'tags' | 'subtasks' | 'task_labels' | 'projects' | 'assignee' | 'time_entries' | 'dependencies' | 'recurring_pattern'>
-export type TaskUpdate = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'column_id' | 'position' | 'is_archived' | 'project_id' | 'assignee_id' | 'timer_started_at' | 'timer_user_id'>>
+export type TaskUpdate = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'due_date' | 'column_id' | 'position' | 'is_archived' | 'project_id' | 'assignee_id' | 'timer_started_at' | 'timer_user_id' | 'reminder_at' | 'cover_image_url' | 'deleted_at' | 'deleted_by'>>
 export type TagInsert = Omit<Tag, 'id' | 'created_at'>
 export type SubtaskInsert = Pick<Subtask, 'task_id' | 'title' | 'position'> & { is_completed?: boolean }
 export type SubtaskUpdate = Partial<Pick<Subtask, 'title' | 'is_completed' | 'position'>>
@@ -191,6 +200,10 @@ export interface UserSettings {
   weekly_digest: boolean
   compact_mode: boolean
   show_completed_tasks: boolean
+  due_date_reminders?: boolean
+  task_assigned?: boolean
+  comment_mentions?: boolean
+  task_completed?: boolean
   created_at: string
   updated_at: string
 }
@@ -236,13 +249,29 @@ export interface TeamInvitation {
   name: string
   role: 'admin' | 'member' | 'viewer'
   status: 'pending' | 'accepted' | 'declined'
+  project_id: string | null
+  invitation_token: string | null
   invited_at: string
   responded_at: string | null
   created_at: string
+  projects?: Project
 }
 
-export type TeamInvitationInsert = Omit<TeamInvitation, 'id' | 'invited_at' | 'responded_at' | 'created_at'>
+export type TeamInvitationInsert = Omit<TeamInvitation, 'id' | 'invited_at' | 'responded_at' | 'created_at' | 'invitation_token'>
 export type TeamInvitationUpdate = Partial<Pick<TeamInvitation, 'status' | 'responded_at'>>
+
+// ==================== PROJECT MEMBERS ====================
+export interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  role: 'admin' | 'member' | 'viewer'
+  invited_by: string | null
+  created_at: string
+  projects?: Project
+}
+
+export type ProjectMemberInsert = Omit<ProjectMember, 'id' | 'created_at'>
 
 // ==================== TIME TRACKING ====================
 export interface TimeEntry {
@@ -353,3 +382,62 @@ export interface BoardMember {
 
 export type BoardMemberInsert = Omit<BoardMember, 'id' | 'created_at'>
 export type BoardMemberUpdate = Partial<Pick<BoardMember, 'role'>>
+
+// ==================== TASK WATCHERS ====================
+export interface TaskWatcher {
+  id: string
+  task_id: string
+  user_id: string
+  created_at: string
+}
+
+export type TaskWatcherInsert = Omit<TaskWatcher, 'id' | 'created_at'>
+
+export interface TaskWatcherWithProfile extends TaskWatcher {
+  profiles: Profile
+}
+
+// ==================== AUTOMATION RULES ====================
+export interface AutomationRule {
+  id: string
+  board_id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  trigger_type: 'task_created' | 'task_moved' | 'task_completed' | 'due_date_approaching' | 'priority_changed'
+  trigger_config: Record<string, any>
+  action_type: 'move_to_column' | 'assign_user' | 'add_label' | 'set_priority' | 'send_notification' | 'add_tag'
+  action_config: Record<string, any>
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AutomationRuleInsert = Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>
+export type AutomationRuleUpdate = Partial<Omit<AutomationRule, 'id' | 'board_id' | 'created_at' | 'updated_at'>>
+
+// ==================== CUSTOM FIELDS ====================
+export interface CustomField {
+  id: string
+  board_id: string
+  name: string
+  field_type: 'text' | 'number' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url'
+  options: { value: string; label: string }[]
+  is_required: boolean
+  position: number
+  created_at: string
+}
+
+export type CustomFieldInsert = Omit<CustomField, 'id' | 'created_at'>
+
+export interface CustomFieldValue {
+  id: string
+  task_id: string
+  field_id: string
+  value: Record<string, any>
+  created_at: string
+  updated_at: string
+  custom_fields?: CustomField
+}
+
+export type CustomFieldValueInsert = Omit<CustomFieldValue, 'id' | 'created_at' | 'updated_at' | 'custom_fields'>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { BoardProvider } from './context/BoardContext'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
@@ -13,6 +14,7 @@ import StatsPanel from './components/Stats/StatsPanel'
 import TaskModal from './components/Modals/TaskModal'
 import ShortcutsModal from './components/Modals/ShortcutsModal'
 import Toast from './components/UI/Toast'
+import InvitationAccept from './components/Auth/InvitationAccept'
 import {
   DashboardView,
   MyTasksView,
@@ -32,6 +34,8 @@ import {
   TemplatesView,
   ActivityView
 } from './components/Views'
+import AutomationView from './components/Board/AutomationView'
+import CustomFieldsView from './components/Board/CustomFieldsView'
 import styles from './App.module.css'
 
 function MainContent() {
@@ -78,6 +82,8 @@ function MainContent() {
       case 'timeline': return <TimelineView key="timeline" />
       case 'templates': return <TemplatesView key="templates" />
       case 'activity': return <ActivityView key="activity" />
+      case 'automation': return <AutomationView key="automation" />
+      case 'custom-fields': return <CustomFieldsView key="custom-fields" />
       default: return <Board key="board-default" />
     }
   }, [currentView])
@@ -143,13 +149,18 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+    <BrowserRouter basename="/kanban.github.io">
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/invite" element={<InvitationAccept />} />
+              <Route path="*" element={<AppContent />} />
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   )
 }
 
