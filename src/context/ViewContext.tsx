@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 type ViewType =
   | 'dashboard'
@@ -33,9 +33,31 @@ interface ViewContextType {
 
 const ViewContext = createContext<ViewContextType | undefined>(undefined)
 
+const VIEW_STORAGE_KEY = 'kanban_current_view'
+
 export function ViewProvider({ children }: { children: ReactNode }) {
-  const [currentView, setCurrentView] = useState<ViewType>('dashboard')
+  // Initialize from localStorage or default to 'dashboard'
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    try {
+      const stored = localStorage.getItem(VIEW_STORAGE_KEY)
+      if (stored) {
+        return stored as ViewType
+      }
+    } catch (e) {
+      console.error('Error loading view from storage:', e)
+    }
+    return 'dashboard'
+  })
   const [viewData, setViewData] = useState<Record<string, unknown>>({})
+
+  // Save to localStorage when view changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, currentView)
+    } catch (e) {
+      console.error('Error saving view to storage:', e)
+    }
+  }, [currentView])
 
   const setView = (view: ViewType) => {
     setCurrentView(view)
