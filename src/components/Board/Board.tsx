@@ -20,6 +20,7 @@ import ColumnSettingsModal from './ColumnSettingsModal'
 import TrashView from './TrashView'
 import CalendarView from './CalendarView'
 import SwimlanesView from './SwimlanesView'
+import DailyGoals from './DailyGoals'
 import { useTheme } from '../../context/ThemeContext'
 import type { Column as ColumnType } from '../../types/database'
 import styles from './Board.module.css'
@@ -366,6 +367,9 @@ export default function Board() {
             {state.focusMode ? <FiMinimize2 /> : <FiMaximize2 />}
             <span>{state.focusMode ? 'Exit Focus' : 'Focus'}</span>
           </button>
+
+          {/* Daily Goals */}
+          <DailyGoals />
 
           <div className={styles.viewToggle}>
             <button
