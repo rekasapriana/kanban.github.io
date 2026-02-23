@@ -32,7 +32,7 @@ const columnClasses = {
 }
 
 export default function Column({ column, tasks, onAddTask, onOpenSettings }: ColumnProps) {
-  const { checkWipLimit } = useBoard()
+  const { checkWipLimit, state } = useBoard()
   const { setNodeRef } = useDroppable({
     id: column.id,
   })
@@ -90,6 +90,7 @@ export default function Column({ column, tasks, onAddTask, onOpenSettings }: Col
               task={task}
               isArchived={isArchive}
               isDone={isDone}
+              isFocused={state.focusMode && state.focusTaskId === task.id}
             />
           ))}
 

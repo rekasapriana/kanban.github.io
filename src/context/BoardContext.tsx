@@ -69,6 +69,8 @@ const initialState: BoardState = {
   isShortcutsModalOpen: false,
   isRealtimeConnected: false,
   viewMode: 'board',
+  focusMode: false,
+  focusTaskId: null,
   history: [],
   historyIndex: -1,
   canUndo: false,
@@ -225,6 +227,14 @@ function boardReducer(state: BoardState, action: BoardAction): BoardState {
         canRedo: newIndex < state.history.length - 1
       }
     }
+    case 'TOGGLE_FOCUS_MODE': {
+      const newFocusMode = !state.focusMode
+      return {
+        ...state,
+        focusMode: newFocusMode,
+        focusTaskId: action.payload || (newFocusMode ? state.selectedTaskId : null)
+      }
+    }
     default:
       return state
   }
@@ -261,6 +271,7 @@ interface BoardContextType {
   setViewMode: (mode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash') => void
   updateColumn: (columnId: string, updates: ColumnUpdate) => Promise<void>
   checkWipLimit: (columnId: string) => { atLimit: boolean; current: number; limit: number | null }
+  toggleFocusMode: (taskId?: string) => void
   undo: () => void
   redo: () => void
 }
@@ -849,6 +860,10 @@ export function BoardProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'TOGGLE_SHORTCUTS_MODAL' })
   }, [])
 
+  const toggleFocusMode = useCallback((taskId?: string) => {
+    dispatch({ type: 'TOGGLE_FOCUS_MODE', payload: taskId })
+  }, [])
+
   const exportData = useCallback(() => {
     if (!state.board || !state.columns || !state.tasks) return
     api.exportData(state.board, state.columns, state.tasks)
@@ -991,6 +1006,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       closeDetailPanel,
       toggleStatsPanel,
       toggleShortcutsModal,
+      toggleFocusMode,
       exportData: exportDataEnhanced,
       setViewMode,
       updateColumn,

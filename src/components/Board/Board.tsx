@@ -9,7 +9,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { FiSearch, FiGrid, FiList, FiX, FiTrash2, FiMove, FiAlertCircle, FiCheckCircle, FiClock, FiFlag, FiCalendar, FiLayers } from 'react-icons/fi'
+import { FiSearch, FiGrid, FiList, FiX, FiTrash2, FiMove, FiAlertCircle, FiCheckCircle, FiClock, FiFlag, FiCalendar, FiLayers, FiMaximize2, FiMinimize2 } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import Column from './Column'
@@ -25,7 +25,7 @@ import type { Column as ColumnType } from '../../types/database'
 import styles from './Board.module.css'
 
 export default function Board() {
-  const { state, moveTask, openModal, closeDetailPanel, openDetailPanel, deleteTask, toggleShortcutsModal, toggleStatsPanel, setSearchQuery, setViewMode, clearSelectedTasks, bulkDeleteTasks, bulkMoveTasks, bulkUpdatePriority, undo, redo } = useBoard()
+  const { state, moveTask, openModal, closeDetailPanel, openDetailPanel, deleteTask, toggleShortcutsModal, toggleStatsPanel, setSearchQuery, setViewMode, clearSelectedTasks, bulkDeleteTasks, bulkMoveTasks, bulkUpdatePriority, toggleFocusMode, undo, redo } = useBoard()
   const { user } = useAuth()
   const { toggleTheme } = useTheme()
   const [activeTask, setActiveTask] = useState<string | null>(null)
@@ -357,6 +357,16 @@ export default function Board() {
             assignees={getAllAssignees()}
           />
 
+          {/* Focus Mode Toggle */}
+          <button
+            className={`${styles.focusModeBtn} ${state.focusMode ? styles.active : ''}`}
+            onClick={() => toggleFocusMode()}
+            title={state.focusMode ? 'Exit Focus Mode' : 'Focus Mode - Highlight selected task'}
+          >
+            {state.focusMode ? <FiMinimize2 /> : <FiMaximize2 />}
+            <span>{state.focusMode ? 'Exit Focus' : 'Focus'}</span>
+          </button>
+
           <div className={styles.viewToggle}>
             <button
               className={`${styles.viewBtn} ${state.viewMode === 'board' ? styles.active : ''}`}
@@ -405,7 +415,7 @@ export default function Board() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className={styles.board}>
+          <div className={`${styles.board} ${state.focusMode ? styles.boardFocusMode : ''}`}>
             {/* Main Columns - One Row */}
             <div className={styles.boardRow}>
               {mainColumns.map(column => (

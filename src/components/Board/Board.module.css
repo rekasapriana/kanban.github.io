@@ -27,6 +27,32 @@
   gap: 12px;
 }
 
+/* Focus Mode */
+.focusModeBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.focusModeBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.focusModeBtn.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: white;
+}
+
 .searchBox {
   display: flex;
   align-items: center;
@@ -423,6 +449,22 @@
 
 .task.rotten {
   border-top: 3px solid #991b1b;
+}
+
+/* Focus Mode - Dimmed Tasks */
+.boardFocusMode .task {
+  opacity: 0.3;
+  filter: grayscale(50%);
+  pointer-events: none;
+}
+
+.boardFocusMode .task.focused {
+  opacity: 1;
+  filter: none;
+  pointer-events: auto;
+  box-shadow: 0 0 0 3px #4f46e5, 0 8px 24px rgba(79, 70, 229, 0.3);
+  transform: scale(1.02);
+  z-index: 10;
 }
 
 /* Task that cannot be dragged */

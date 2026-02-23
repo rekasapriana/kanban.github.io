@@ -35,6 +35,9 @@ export interface BoardState {
   isShortcutsModalOpen: boolean
   isRealtimeConnected: boolean
   viewMode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash'
+  // Focus Mode
+  focusMode: boolean
+  focusTaskId: string | null
   // Undo/Redo
   history: import('./database').Task[][]
   historyIndex: number
@@ -72,3 +75,4 @@ export type BoardAction =
   | { type: 'PUSH_HISTORY'; payload: import('./database').Task[] }
   | { type: 'UNDO' }
   | { type: 'REDO' }
+  | { type: 'TOGGLE_FOCUS_MODE'; payload?: string }

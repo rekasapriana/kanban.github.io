@@ -16,6 +16,7 @@ interface TaskCardProps {
   isArchived?: boolean
   isDragging?: boolean
   isDone?: boolean
+  isFocused?: boolean
 }
 
 // Get task age indicator color based on time in column
@@ -42,7 +43,7 @@ const getTaskAgeInfo = (updatedAt: string, isDone: boolean) => {
   }
 }
 
-export default function TaskCard({ task, isArchived = false, isDragging = false, isDone = false }: TaskCardProps) {
+export default function TaskCard({ task, isArchived = false, isDragging = false, isDone = false, isFocused = false }: TaskCardProps) {
   const { openEditModal, deleteTask, restoreTask, openDetailPanel, toggleSelectedTask, state } = useBoard()
   const { user, profile } = useAuth()
   const [isStarred, setIsStarred] = useState(false)
@@ -185,7 +186,7 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     <div
       ref={setRefs}
       style={style}
-      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''} ${isSelected ? styles.taskBulkSelected : ''} ${taskAge ? styles[taskAge.class] : ''}`}
+      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''} ${isSelected ? styles.taskBulkSelected : ''} ${taskAge ? styles[taskAge.class] : ''} ${isFocused ? styles.focused : ''}`}
       data-priority={task.priority}
       onClick={() => openDetailPanel(task.id)}
       {...attributes}
