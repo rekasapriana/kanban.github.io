@@ -13,6 +13,7 @@ import Board from './components/Board/Board'
 import StatsPanel from './components/Stats/StatsPanel'
 import TaskModal from './components/Modals/TaskModal'
 import ShortcutsModal from './components/Modals/ShortcutsModal'
+import TaskDetailPanel from './components/TaskDetail/TaskDetailPanel'
 import Toast from './components/UI/Toast'
 import InvitationAccept from './components/Auth/InvitationAccept'
 import {
@@ -106,6 +107,7 @@ function MainContent() {
         </div>
         <TaskModal />
         <ShortcutsModal />
+        <TaskDetailPanel />
         <Toast />
       </div>
     </div>

@@ -34,7 +34,7 @@ export interface BoardState {
   isStatsPanelOpen: boolean
   isShortcutsModalOpen: boolean
   isRealtimeConnected: boolean
-  viewMode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash'
+  viewMode: 'board' | 'list' | 'calendar' | 'swimlanes' | 'sprint' | 'matrix' | 'metrics' | 'achievements' | 'voting' | 'print' | 'trash'
   // Focus Mode
   focusMode: boolean
   focusTaskId: string | null
@@ -70,7 +70,7 @@ export type BoardAction =
   | { type: 'TOGGLE_STATS_PANEL' }
   | { type: 'TOGGLE_SHORTCUTS_MODAL' }
   | { type: 'SET_REALTIME_CONNECTED'; payload: boolean }
-  | { type: 'SET_VIEW_MODE'; payload: 'board' | 'list' | 'calendar' | 'swimlanes' | 'trash' }
+  | { type: 'SET_VIEW_MODE'; payload: 'board' | 'list' | 'calendar' | 'swimlanes' | 'sprint' | 'matrix' | 'metrics' | 'achievements' | 'voting' | 'print' | 'trash' }
   | { type: 'UPDATE_COLUMN'; payload: import('./database').Column }
   | { type: 'PUSH_HISTORY'; payload: import('./database').Task[] }
   | { type: 'UNDO' }

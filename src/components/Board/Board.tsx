@@ -9,18 +9,27 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { FiSearch, FiGrid, FiList, FiX, FiTrash2, FiMove, FiAlertCircle, FiCheckCircle, FiClock, FiFlag, FiCalendar, FiLayers, FiMaximize2, FiMinimize2 } from 'react-icons/fi'
+import { FiSearch, FiGrid, FiList, FiX, FiTrash2, FiMove, FiAlertCircle, FiCheckCircle, FiClock, FiFlag, FiCalendar, FiLayers, FiMaximize2, FiMinimize2, FiTarget, FiAlertTriangle, FiBarChart2, FiAward, FiThumbsUp, FiPrinter, FiShare2 } from 'react-icons/fi'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
 import Column from './Column'
 import TaskCard from './TaskCard'
-import TaskDetailPanel from '../TaskDetail/TaskDetailPanel'
 import AdvancedFilters from './AdvancedFilters'
 import ColumnSettingsModal from './ColumnSettingsModal'
 import TrashView from './TrashView'
 import CalendarView from './CalendarView'
 import SwimlanesView from './SwimlanesView'
 import DailyGoals from './DailyGoals'
+import QuickNotes from './QuickNotes'
+import SprintView from './SprintView'
+import PriorityMatrixView from './PriorityMatrixView'
+import KanbanMetricsView from './KanbanMetricsView'
+import AchievementsView from './AchievementsView'
+import PomodoroTimer from './PomodoroTimer'
+import TaskVoting from './TaskVoting'
+import BoardBackground from './BoardBackground'
+import PrintView from './PrintView'
+import PublicSharing from './PublicSharing'
 import { useTheme } from '../../context/ThemeContext'
 import type { Column as ColumnType } from '../../types/database'
 import styles from './Board.module.css'
@@ -371,6 +380,18 @@ export default function Board() {
           {/* Daily Goals */}
           <DailyGoals />
 
+          {/* Quick Notes */}
+          <QuickNotes />
+
+          {/* Pomodoro Timer */}
+          <PomodoroTimer />
+
+          {/* Board Background */}
+          <BoardBackground />
+
+          {/* Public Sharing */}
+          <PublicSharing />
+
           <div className={styles.viewToggle}>
             <button
               className={`${styles.viewBtn} ${state.viewMode === 'board' ? styles.active : ''}`}
@@ -399,6 +420,48 @@ export default function Board() {
               title="Calendar View"
             >
               <FiCalendar />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'sprint' ? styles.active : ''}`}
+              onClick={() => setViewMode('sprint')}
+              title="Sprint Planning"
+            >
+              <FiTarget />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'matrix' ? styles.active : ''}`}
+              onClick={() => setViewMode('matrix')}
+              title="Priority Matrix"
+            >
+              <FiAlertTriangle />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'metrics' ? styles.active : ''}`}
+              onClick={() => setViewMode('metrics')}
+              title="Kanban Metrics"
+            >
+              <FiBarChart2 />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'achievements' ? styles.active : ''}`}
+              onClick={() => setViewMode('achievements')}
+              title="Achievements"
+            >
+              <FiAward />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'voting' ? styles.active : ''}`}
+              onClick={() => setViewMode('voting')}
+              title="Task Voting"
+            >
+              <FiThumbsUp />
+            </button>
+            <button
+              className={`${styles.viewBtn} ${state.viewMode === 'print' ? styles.active : ''}`}
+              onClick={() => setViewMode('print')}
+              title="Print View"
+            >
+              <FiPrinter />
             </button>
             <button
               className={`${styles.viewBtn} ${state.viewMode === 'trash' ? styles.active : ''}`}
@@ -451,6 +514,24 @@ export default function Board() {
       ) : state.viewMode === 'swimlanes' ? (
         /* Swimlanes View */
         <SwimlanesView onTaskClick={openDetailPanel} onAddTask={openModal} />
+      ) : state.viewMode === 'sprint' ? (
+        /* Sprint View */
+        <SprintView onTaskClick={openDetailPanel} />
+      ) : state.viewMode === 'matrix' ? (
+        /* Priority Matrix View */
+        <PriorityMatrixView onTaskClick={openDetailPanel} />
+      ) : state.viewMode === 'metrics' ? (
+        /* Kanban Metrics View */
+        <KanbanMetricsView />
+      ) : state.viewMode === 'achievements' ? (
+        /* Achievements View */
+        <AchievementsView />
+      ) : state.viewMode === 'voting' ? (
+        /* Task Voting View */
+        <TaskVoting onTaskClick={openDetailPanel} />
+      ) : state.viewMode === 'print' ? (
+        /* Print View */
+        <PrintView />
       ) : (
         /* List View */
         <div className={styles.listView}>
@@ -481,9 +562,6 @@ export default function Board() {
           )}
         </div>
       )}
-
-      {/* Task Detail Panel */}
-      <TaskDetailPanel />
 
       {/* Column Settings Modal */}
       {settingsColumn && (

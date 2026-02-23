@@ -4,7 +4,7 @@ import { FiCheck, FiCircle, FiClock, FiAlertCircle } from 'react-icons/fi'
 import styles from './Views.module.css'
 
 export default function MyTasksView() {
-  const { state, openModal, selectTask } = useBoard()
+  const { state, openDetailPanel } = useBoard()
   const [filter, setFilter] = useState<string>('all')
 
   // Get column IDs by title
@@ -92,10 +92,7 @@ export default function MyTasksView() {
                   <div
                     key={task.id}
                     className={styles.myTaskCard}
-                    onClick={() => {
-                      selectTask(task.id)
-                      openModal()
-                    }}
+                    onClick={() => openDetailPanel(task.id)}
                   >
                     <div className={styles.taskHeader}>
                       <span className={styles.taskTitle}>{task.title}</span>

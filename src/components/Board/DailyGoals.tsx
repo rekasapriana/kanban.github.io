@@ -88,12 +88,7 @@ export default function DailyGoals() {
     <div className={`${styles.dailyGoals} ${isGoalMet ? styles.goalMet : ''}`}>
       <div className={styles.dailyGoalsHeader}>
         <FiTarget />
-        <span>Daily Goal</span>
-        {isGoalMet && (
-          <span className={styles.goalAchieved}>
-            <FiTrendingUp /> Achieved!
-          </span>
-        )}
+        <span>Goal</span>
       </div>
 
       <div className={styles.dailyGoalsContent}>
@@ -108,7 +103,6 @@ export default function DailyGoals() {
               onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
               autoFocus
             />
-            <span>tasks</span>
             <button onClick={saveGoal} title="Save">
               <FiCheck />
             </button>
@@ -122,7 +116,6 @@ export default function DailyGoals() {
               <span className={styles.completedCount}>{completedToday}</span>
               <span className={styles.goalSeparator}>/</span>
               <span className={styles.goalTarget}>{goal}</span>
-              <span className={styles.goalLabel}>tasks</span>
             </div>
             <div className={styles.goalProgressBar}>
               <div
@@ -133,6 +126,10 @@ export default function DailyGoals() {
           </div>
         )}
       </div>
+
+      {isGoalMet && (
+        <FiTrendingUp style={{ color: '#22c55e', fontSize: '0.875rem' }} title="Goal achieved!" />
+      )}
     </div>
   )
 }

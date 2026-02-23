@@ -34,7 +34,7 @@ interface ViewContextType {
 const ViewContext = createContext<ViewContextType | undefined>(undefined)
 
 export function ViewProvider({ children }: { children: ReactNode }) {
-  const [currentView, setCurrentView] = useState<ViewType>('board')
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [viewData, setViewData] = useState<Record<string, unknown>>({})
 
   const setView = (view: ViewType) => {
