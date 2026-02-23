@@ -390,6 +390,41 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
+/* Task Age Indicator */
+.taskAgeBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 10px 10px 0 0;
+  transition: background-color 0.3s ease;
+}
+
+.task.fresh {
+  border-top: 3px solid #22c55e;
+}
+
+.task.good {
+  border-top: 3px solid #84cc16;
+}
+
+.task.aging {
+  border-top: 3px solid #eab308;
+}
+
+.task.old {
+  border-top: 3px solid #f97316;
+}
+
+.task.stale {
+  border-top: 3px solid #ef4444;
+}
+
+.task.rotten {
+  border-top: 3px solid #991b1b;
+}
+
 /* Task that cannot be dragged */
 .task.noDrag {
   cursor: pointer;

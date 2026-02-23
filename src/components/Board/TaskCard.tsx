@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FiEdit2, FiTrash2, FiRotateCcw, FiCheckSquare, FiCalendar, FiFolder, FiStar, FiLock, FiCheck } from 'react-icons/fi'
+import { FiEdit2, FiTrash2, FiRotateCcw, FiCheckSquare, FiCalendar, FiFolder, FiStar, FiLock, FiCheck, FiClock } from 'react-icons/fi'
 import type { Task } from '../../types/database'
 import { useBoard } from '../../context/BoardContext'
 import { useAuth } from '../../context/AuthContext'
@@ -16,6 +16,30 @@ interface TaskCardProps {
   isArchived?: boolean
   isDragging?: boolean
   isDone?: boolean
+}
+
+// Get task age indicator color based on time in column
+const getTaskAgeInfo = (updatedAt: string, isDone: boolean) => {
+  if (isDone) return null // Don't show age for done tasks
+
+  const now = new Date()
+  const updated = new Date(updatedAt)
+  const ageHours = (now.getTime() - updated.getTime()) / (1000 * 60 * 60)
+  const ageDays = ageHours / 24
+
+  if (ageDays < 1) {
+    return { color: '#22c55e', label: '< 1 day', class: 'fresh' } // Green - fresh
+  } else if (ageDays < 2) {
+    return { color: '#84cc16', label: '1 day', class: 'good' } // Light green
+  } else if (ageDays < 3) {
+    return { color: '#eab308', label: '2 days', class: 'aging' } // Yellow
+  } else if (ageDays < 5) {
+    return { color: '#f97316', label: '3-4 days', class: 'old' } // Orange
+  } else if (ageDays < 7) {
+    return { color: '#ef4444', label: '5-6 days', class: 'stale' } // Red
+  } else {
+    return { color: '#991b1b', label: '1+ week', class: 'rotten' } // Dark red
+  }
 }
 
 export default function TaskCard({ task, isArchived = false, isDragging = false, isDone = false }: TaskCardProps) {
@@ -153,17 +177,29 @@ export default function TaskCard({ task, isArchived = false, isDragging = false,
     }
   }, [setNodeRef])
 
+  // Calculate task age
+  const taskAge = getTaskAgeInfo(task.updated_at, isDone)
+
   return (
     <>
     <div
       ref={setRefs}
       style={style}
-      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''} ${isSelected ? styles.taskBulkSelected : ''}`}
+      className={`${styles.task} ${taskOverdue ? styles.overdue : ''} ${isSortableDragging ? styles.dragging : ''} ${isStarred ? styles.starred : ''} ${!canMove ? styles.noDrag : ''} ${isSelected ? styles.taskBulkSelected : ''} ${taskAge ? styles[taskAge.class] : ''}`}
       data-priority={task.priority}
       onClick={() => openDetailPanel(task.id)}
       {...attributes}
       {...(canMove ? listeners : {})}
     >
+      {/* Task Age Indicator Bar */}
+      {taskAge && (
+        <div
+          className={styles.taskAgeBar}
+          style={{ backgroundColor: taskAge.color }}
+          title={`In column for ${taskAge.label}`}
+        />
+      )}
+
       {/* Bulk Selection Checkbox */}
       <div
         className={`${styles.taskCheckbox} ${isSelected ? styles.checked : ''}`}
